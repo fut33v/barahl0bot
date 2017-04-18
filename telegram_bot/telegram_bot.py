@@ -37,7 +37,8 @@ class TelegramBot:
         self._botan_token = botan_token
 
         bot_util.create_dir_if_not_exists(self._DATA_DIRNAME)
-        self.chats_file = self._DATA_DIRNAME + "chats"
+        self._chats_file = self._DATA_DIRNAME + "chats"
+        self._usernames_file = self._DATA_DIRNAME + "usernames"
 
     def start_poll(self):
         last = 0
@@ -49,7 +50,6 @@ class TelegramBot:
                 except ValueError as e:
                     print "Error while polling (json.loads):", e
                     continue
-                # print r["result"]
                 for update in r["result"]:
                     if len(update) > 0:
                         print update
@@ -69,18 +69,20 @@ class TelegramBot:
 
             chat_id = telegram_bot_protocol.get_chat_id(message)
             chat_id_string = str(chat_id) + "\n"
-            if bot_util.check_file_for_string(self.chats_file, chat_id_string):
-                open(self.chats_file, 'a').write(chat_id_string)
+            if bot_util.check_file_for_string(self._chats_file, chat_id_string):
+                open(self._chats_file, 'a').write(chat_id_string)
 
             text = telegram_bot_protocol.get_text(message)
 
             if chat_id and text:
-                user_id = ""
+                username = ""
                 if 'from' in message:
                     from_ = message['from']
                     if 'username' in from_:
-                        user_id = from_['username']
-                self._process_message(user_id, chat_id, text)
+                        username = str(from_['username'])
+                        if bot_util.check_file_for_string(self._usernames_file, username):
+                            open(self._usernames_file, 'a').write(username)
+                self._process_message(username, chat_id, text)
 
     def _process_message(self, user_id, chat_id, text):
         raise NotImplemented
@@ -138,9 +140,6 @@ class TelegramBot:
             return m.group(1)
         else:
             return None
-
-    def _get_start_message(self):
-        return "Default /start message"
 
 
 if __name__ == "__main__":
