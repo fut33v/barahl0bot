@@ -1,7 +1,6 @@
 # coding=utf-8
 import re
 
-import get_photos
 from util import bot_util
 from telegram_bot.telegram_bot import TelegramBot
 
