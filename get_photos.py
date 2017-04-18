@@ -21,7 +21,7 @@ def read_previous_photo_date(a):
 
 
 def build_url(owner_id, album_id):
-    return "https://api.vk.com/method/photos.get?album_id={a}&owner_id={o}&v=5.63".format(a=album_id, o=owner_id)
+    return "https://api.vk.com/method/photos.get?album_id={a}&owner_id={o}&rev=1&v=5.63".format(a=album_id, o=owner_id)
 
 
 def get_latest_for_album(owner_id, album_id):
@@ -66,8 +66,8 @@ def get_latest_for_album(owner_id, album_id):
             id = str(latest_item['id'])
 
         # latest_product = text + "\n" + photo_url + "\n\n" +"https://vk.com/id" + user_id
-        latest_product = photo_url + "\n\nhttps://vk.com/id" + user_id + "\n"
-        latest_product += "\n\nhttps://vk.com/photo" + owner_id + "_" + id
+        latest_product = photo_url + "\n\nSeller: https://vk.com/id" + user_id + "\n"
+        latest_product += "\n\nVK photo link: https://vk.com/photo" + owner_id + "_" + id
         # print latest_product
         return latest_product
 
