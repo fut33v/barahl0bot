@@ -75,17 +75,15 @@ class TelegramBot:
             text = telegram_bot_protocol.get_text(message)
 
             if chat_id and text:
-                success = self._process_message(chat_id, text)
-                if self._botan_token and success:
-                    user_id = telegram_bot_protocol.get_user_id(message)
-                    if user_id:
-                        self._botan_track(user_id, message, text)
+                user_id = ""
+                if 'from' in message:
+                    from_ = message['from']
+                    if 'username' in from_:
+                        user_id = from_['username']
+                self._process_message(user_id, chat_id, text)
 
-    def _process_message(self, chat_id, text):
+    def _process_message(self, user_id, chat_id, text):
         raise NotImplemented
-
-    def _botan_track(self, user_id, message, text):
-        botan.track(self._botan_token, user_id, message, text)
 
     def send_response(self, chat_id, response, markdown=False):
         if response is None or chat_id is None or response == '':

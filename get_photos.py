@@ -1,12 +1,11 @@
 import json
 
+import barahl0bot
 from broadcast import broadcast_message
 from util import bot_util
 import time
 
-_DATA_DIRNAME = "data/"
-_PREVIOUS_PHOTO_DATE_FILENAME = _DATA_DIRNAME + 'previous_photo_date'
-_ALBUMS_FILENAME = _DATA_DIRNAME + 'albums'
+_PREVIOUS_PHOTO_DATE_FILENAME = barahl0bot.DATA_DIRNAME + 'previous_photo_date'
 
 
 def write_previous_photo_date(d, a):
@@ -80,7 +79,7 @@ def get_latest_for_album(owner_id, album_id):
 
 if __name__ == "__main__":
     while True:
-        with open(_ALBUMS_FILENAME, "r") as albums_file:
+        with open(barahl0bot.ALBUMS_FILENAME, "r") as albums_file:
             lines = albums_file.readlines()
             for l in lines:
                 l = l[:-1]
