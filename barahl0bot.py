@@ -25,7 +25,7 @@ class BarahloBot(TelegramBot):
             """
         else:
             response = "Чего блять?"
-            if user_id == "fut33v":
+            if user_id == "fut33v" or user_id == "Gamilzirak":
                 command = text.split(' ')
                 if len(command) == 2:
                     if command[0] == "/addalbum":
