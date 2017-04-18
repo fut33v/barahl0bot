@@ -27,6 +27,8 @@ def build_url(owner_id, album_id):
 def get_latest_for_album(owner_id, album_id):
     u = build_url(owner_id, album_id)
     response_text = bot_util.urlopen(u)
+    if response_text == False:
+        return None
     response_json = json.loads(response_text)
     max_date = read_previous_photo_date(owner_id + "_" +album_id)
     latest_item = None
@@ -83,6 +85,7 @@ if __name__ == "__main__":
                 album_id = oa_id[1]
                 print owner_id, album_id
                 p = get_latest_for_album(owner_id, album_id)
-            broadcast_message(p)
+                if p is not None:
+                    broadcast_message(p)
         time.sleep(30)
         print "tick"
