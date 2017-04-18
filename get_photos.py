@@ -90,7 +90,6 @@ if __name__ == "__main__":
                 album_id = oa_id[1]
                 print owner_id, album_id
                 p = get_latest_for_album(owner_id, album_id)
-                print p
                 if p is not None:
                     broadcast_message(p)
         time.sleep(30)
