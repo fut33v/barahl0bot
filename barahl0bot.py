@@ -6,13 +6,11 @@ from telegram_bot.telegram_bot import TelegramBot
 __author__ = 'fut33v'
 
 TOKEN_FILENAME = "data/token"
-BOTAN_TOKEN_FILENAME = "data/botan_token"
-WEATHER_COM_TOKEN_FILENAME = "data/weather_com_token"
 
 
 class BarahloBot(TelegramBot):
-    def __init__(self, token, name, weather_com_token=None, botan_token=None):
-        TelegramBot.__init__(self, token, name, botan_token)
+    def __init__(self, token, name):
+        TelegramBot.__init__(self, token, name)
 
     def _process_message(self, chat_id, text):
         if text == '/start':
@@ -36,5 +34,5 @@ class BarahloBot(TelegramBot):
 
 if __name__ == "__main__":
     t = bot_util.read_one_string_file(TOKEN_FILENAME)
-    bot = BarahloBot(t, name="NovgorodWeatherBot")
+    bot = BarahloBot(t, name="barahl0bot")
     bot.start_poll()

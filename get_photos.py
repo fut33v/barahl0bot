@@ -27,7 +27,7 @@ def build_url(owner_id, album_id):
 def get_latest_for_album(owner_id, album_id):
     u = build_url(owner_id, album_id)
     response_text = bot_util.urlopen(u)
-    if response_text == False:
+    if not response_text:
         return None
     response_json = json.loads(response_text)
     max_date = read_previous_photo_date(owner_id + "_" +album_id)
@@ -46,8 +46,6 @@ def get_latest_for_album(owner_id, album_id):
     write_previous_photo_date(max_date, owner_id + "_" +album_id)
 
     if latest_item is not None:
-        latest_product = ""
-
         photo_url = ""
         if 'photo_1280' in latest_item:
             photo_url = latest_item['photo_1280']
@@ -57,23 +55,31 @@ def get_latest_for_album(owner_id, album_id):
             photo_url = latest_item['photo_604']
         user_id = ""
         if 'user_id' in latest_item:
-            user_id = str(latest_item['user_id'])
+            user_id = latest_item['user_id']
+            if user_id == 100:
+                user_id = None
+            else:
+                user_id = str(user_id)
         text = ""
         if 'text' in latest_item:
             text = latest_item['text']
-        id = ""
+        photo_id = ""
         if 'id' in latest_item:
-            id = str(latest_item['id'])
+            photo_id = str(latest_item['id'])
 
-        # latest_product = text + "\n" + photo_url + "\n\n" +"https://vk.com/id" + user_id
-        latest_product = photo_url + "\n\nSeller: https://vk.com/id" + user_id + "\n"
-        latest_product += "\n\nVK photo link: https://vk.com/photo" + owner_id + "_" + id
-        # print latest_product
+        latest_product = photo_url + "\n\n"
+        text = text.lower()
+        text = text.replace('\n', ' ')
+        latest_product += text + "\n\n"
+        if user_id is not None:
+            latest_product += "https://vk.com/id" + user_id + "\n"
+        latest_product += "https://vk.com/photo" + owner_id + "_" + photo_id + "\n"
+
         return latest_product
 
 
 if __name__ == "__main__":
-    while(True):
+    while True:
         with open(_ALBUMS_FILENAME, "r") as albums_file:
             lines = albums_file.readlines()
             for l in lines:
@@ -85,6 +91,7 @@ if __name__ == "__main__":
                 album_id = oa_id[1]
                 print owner_id, album_id
                 p = get_latest_for_album(owner_id, album_id)
+                print p
                 if p is not None:
                     broadcast_message(p)
         time.sleep(30)
