@@ -4,18 +4,19 @@ import json
 
 import barahl0bot
 from broadcast import broadcast_message
+from check_photo import is_photo_unique
 from util import bot_util
 import time
 
 _PREVIOUS_PHOTO_DATE_FILENAME = barahl0bot.DATA_DIRNAME + 'previous_photo_date'
-
+_HASH_FILENAME = barahl0bot.DATA_DIRNAME + 'hash'
 
 def write_previous_photo_date(d, a):
-    open(_PREVIOUS_PHOTO_DATE_FILENAME+a, 'w').write(str(d))
+    open(_PREVIOUS_PHOTO_DATE_FILENAME + a, 'w').write(str(d))
 
 
 def read_previous_photo_date(a):
-    u = bot_util.read_one_string_file(_PREVIOUS_PHOTO_DATE_FILENAME+a)
+    u = bot_util.read_one_string_file(_PREVIOUS_PHOTO_DATE_FILENAME + a)
     if u == '' or None == u:
         return 0
     return int(u)
@@ -25,40 +26,49 @@ def build_url(owner_id, album_id):
     return "https://api.vk.com/method/photos.get?album_id={a}&owner_id={o}&rev=1&v=5.63".format(a=album_id, o=owner_id)
 
 
+def get_photo_url(latest_photo):
+    if latest_photo is None:
+        return None
+    photo_url = ""
+    if 'photo_1280' in latest_photo:
+        photo_url = latest_photo['photo_1280']
+    elif 'photo_807' in latest_photo:
+        photo_url = latest_photo['photo_807']
+    elif 'photo_604' in latest_photo:
+        photo_url = latest_photo['photo_604']
+    return photo_url
+
+
 def build_message(latest_photo):
-    if latest_photo is not None:
-        photo_url = ""
-        if 'photo_1280' in latest_photo:
-            photo_url = latest_photo['photo_1280']
-        elif 'photo_807' in latest_photo:
-            photo_url = latest_photo['photo_807']
-        elif 'photo_604' in latest_photo:
-            photo_url = latest_photo['photo_604']
-        user_id = ""
-        if 'user_id' in latest_photo:
-            user_id = latest_photo['user_id']
-            if user_id == 100:
-                user_id = None
-            else:
-                user_id = str(user_id)
-        text = ""
-        if 'text' in latest_photo:
-            text = latest_photo['text']
-        photo_id = ""
-        if 'id' in latest_photo:
-            photo_id = str(latest_photo['id'])
+    if latest_photo is None:
+        return None
+    photo_url = get_photo_url(latest_photo)
+    user_id = ""
+    if 'user_id' in latest_photo:
+        user_id = latest_photo['user_id']
+        if user_id == 100:
+            user_id = None
+        else:
+            user_id = str(user_id)
+    text = ""
+    if 'text' in latest_photo:
+        text = latest_photo['text']
+    photo_id = ""
+    if 'id' in latest_photo:
+        photo_id = str(latest_photo['id'])
 
-        latest_product = u""
-        latest_product += photo_url + "\n\n"
-        if text != "":
-            text = text.lower()
-            text = text.replace('\n', ' ')
-            latest_product += u"Описание: " +text + "\n\n"
-        if user_id is not None:
-            latest_product += u"Продавец: https://vk.com/id" + user_id + "\n"
-        latest_product += u"Фото: https://vk.com/photo" + owner_id + "_" + photo_id + "\n"
+    latest_product = u""
+    latest_product += photo_url + "\n\n"
+    if text != "":
+        text = text.lower()
+        text = text.replace('\n', ' ')
+        latest_product += u"Описание: " + text + "\n\n"
+    if user_id is not None:
+        latest_product += u"Продавец: https://vk.com/id" + user_id + "\n"
+    latest_product += u"Фото: https://vk.com/photo" + owner_id + "_" + photo_id + "\n"
 
-        return latest_product
+    return latest_product
+
 
 def get_latest_for_album(owner_id, album_id):
     u = build_url(owner_id, album_id)
@@ -66,7 +76,7 @@ def get_latest_for_album(owner_id, album_id):
     if not response_text:
         return None
     response_json = json.loads(response_text)
-    max_date = read_previous_photo_date(owner_id + "_" +album_id)
+    max_date = read_previous_photo_date(owner_id + "_" + album_id)
     latest_item = None
     if 'response' in response_json:
         response = response_json['response']
@@ -79,10 +89,13 @@ def get_latest_for_album(owner_id, album_id):
                         max_date = date
                         latest_item = item
 
-    write_previous_photo_date(max_date, owner_id + "_" +album_id)
+    write_previous_photo_date(max_date, owner_id + "_" + album_id)
 
-    return build_message(latest_item)
-
+    photo_url = get_photo_url(latest_item)
+    if photo_url:
+        if is_photo_unique(_HASH_FILENAME, photo_url):
+            return build_message(latest_item)
+    return None
 
 if __name__ == "__main__":
     while True:

@@ -1,6 +1,8 @@
 import json
 import re
 import time
+import urllib
+import urllib2
 
 from util import bot_util
 import telegram_bot_protocol
@@ -20,8 +22,6 @@ class TelegramBot:
         self.name = name
 
         self._commands_no_parameter = []
-        self.add_command_no_parameter(self._COMMAND_START)
-        self.add_command_no_parameter(self._COMMAND_HELP)
 
         self._commands_with_parameter = []
         self._commands_with_parameters_regexps_dict = {}
@@ -50,15 +50,21 @@ class TelegramBot:
                 except ValueError as e:
                     print "Error while polling (json.loads):", e
                     continue
-                for update in r["result"]:
-                    if len(update) > 0:
-                        print update
-                    if self._previous_update_date >= int(update["message"]["date"]):
-                        continue
-                    last = int(update["update_id"])
-                    self._process_update(update)
-                    previous_update_date = int(update["message"]["date"])
-                    self._write_previous_update_date(previous_update_date)
+                if 'result' in r:
+                    for update in r['result']:
+                        if len(update) > 0:
+                            print update
+                        if 'message' in update:
+                            message = update['message']
+                            if 'date' in message:
+                                date = message['date']
+                                if self._previous_update_date >= int(date):
+                                    continue
+                                if 'update_id' in update:
+                                    last = int(update["update_id"])
+                                self._process_update(update)
+                                previous_update_date = int(date)
+                                self._write_previous_update_date(previous_update_date)
             time.sleep(3)
 
     def _process_update(self, update):
@@ -100,52 +106,28 @@ class TelegramBot:
             d['parse_mode'] = "Markdown"
         return bot_util.urlopen(self._url_send_message, data=d)
 
+    def send_to_channel(self, channel_id, response):
+        if response is None or channel_id is None or response == '':
+            return False
+        # _url = self._url_send_message + "?chat_id=@" + channel_id + "&text=" + response
+        # print _url
+        data = {
+            'text': response,
+        }
+        data = urllib.urlencode(data) + "&chat_id=@" + channel_id
+        print data
+        urllib2.urlopen(self._url_send_message, data)
+        # return bot_util.urlopen(_url)
+
     def _read_previous_update_date(self):
         u = bot_util.read_one_string_file(self._PREVIOUS_UPDATE_DATE_FILENAME)
-        if u == '' or None == u:
+        if u == '' or u is None:
             return 0
         return int(u)
 
     def _write_previous_update_date(self, d):
         open(self._PREVIOUS_UPDATE_DATE_FILENAME, 'w').write(str(d))
 
-    def _get_command_name_in_group(self, command_name):
-        command_name_in_group = command_name + "@" + self.name
-        return command_name_in_group
-
-    def _check_message_for_command(self, text, command_name):
-        return text == command_name or text == self._get_command_name_in_group(command_name)
-
-    def add_command_no_parameter(self, command_name):
-        command_name_in_group = self._get_command_name_in_group(command_name)
-        self._commands_no_parameter.append(command_name)
-        self._commands_no_parameter.append(command_name_in_group)
-
-    def add_command_with_parameter(self, command_name):
-        command_name_in_group = self._get_command_name_in_group(command_name)
-        self._commands_with_parameter.append(command_name)
-        self._commands_with_parameter.append(command_name_in_group)
-        self._commands_with_parameters_regexps_dict[command_name] = re.compile(command_name + " (.*)")
-        self._commands_with_parameters_regexps_dict[command_name_in_group] = re.compile(command_name_in_group + " (.*)")
-
-    def _get_command_parameter(self, command_name, text):
-        if command_name not in self._commands_with_parameters_regexps_dict:
-            print "Command with name", command_name, "not command with parameters"
-            return None
-        r = self._commands_with_parameters_regexps_dict[command_name]
-        m = r.match(text)
-        if m is None:
-            return None
-        if m.group(1) != '':
-            return m.group(1)
-        else:
-            return None
-
 
 if __name__ == "__main__":
     t = TelegramBot("", "name")
-    t.add_command_with_parameter("/lox")
-    ret = t._get_command_parameter("/lox", "/lox abcd")
-    print ret
-    ret = t._get_command_parameter("/lox@name", "/lox@name abcd")
-    print ret

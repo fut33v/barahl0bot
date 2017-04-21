@@ -12,6 +12,7 @@ def urlopen(url, data=None):
     try:
         if data is not None:
             data = urllib.urlencode(data)
+            print data
             urllib2.urlopen(url, data)
             return True
         else:
@@ -20,8 +21,8 @@ def urlopen(url, data=None):
         print "HTTPError", e, url, data
     except urllib2.URLError as e:
         print "URLError", e, url, data
-    # except httplib.HTTPException as e:
-    #     print "HTTPException", e
+    except Exception as e:
+        print "Exception", e, url, data
     return False
 
 
@@ -45,6 +46,10 @@ def check_file_for_string(filename, string):
         if line == string:
             return False
     return True
+
+
+def append_string_to_file(file_name, string):
+    open(file_name, 'a').write(string)
 
 
 def create_dir_if_not_exists(directory):
