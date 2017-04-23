@@ -36,6 +36,13 @@ def read_one_string_file(filename):
     except IOError:
         return None
 
+def read_lines(filename):
+    try:
+        f = open(filename, 'r')
+        s = f.readlines()
+        return s
+    except IOError:
+        return None
 
 def check_file_for_string(filename, string):
     if not os.path.exists(filename):

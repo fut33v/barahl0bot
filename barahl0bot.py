@@ -42,6 +42,13 @@ Github: https://github.com/fut33v/barahl0bot
             """
         else:
             response = "Чего блять?"
+            if text == "/getalbums":
+                albums = bot_util.read_lines(ALBUMS_FILENAME)
+                if albums:
+                    response = ""
+                    for a in albums:
+                        response += "https://vk.com/album" + a
+            # admin stuff
             if user_id in admins:
                 command = text.split(' ')
                 if len(command) == 2:
@@ -54,9 +61,17 @@ Github: https://github.com/fut33v/barahl0bot
                                 response = "Альбом добавлен"
                             else:
                                 response = "Не, такой альбом есть уже"
+                elif len(command) == 1:
+                    if command[0] == '/getchats':
+                        response = str(len(bot_util.read_lines(self._chats_file)))
+                    if command[0] == '/getusers':
+                        response = ""
+                        usernames = bot_util.read_lines(self._usernames_file)
+                        for u in usernames:
+                            response += "@" + u
 
         if response:
-            success = self.send_response(chat_id, response=response, markdown=True)
+            success = self.send_response(chat_id, response=response)
             return success
         return False
 
