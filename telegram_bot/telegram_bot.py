@@ -86,8 +86,8 @@ class TelegramBot:
                     from_ = message['from']
                     if 'username' in from_:
                         username = str(from_['username'])
-                        if bot_util.check_file_for_string(self._usernames_file, username):
-                            open(self._usernames_file, 'a').write(username)
+                        if bot_util.check_file_for_string(self._usernames_file, username + "\n"):
+                            open(self._usernames_file, 'a').write(username + "\n")
                 self._process_message(username, chat_id, text)
 
     def _process_message(self, user_id, chat_id, text):
