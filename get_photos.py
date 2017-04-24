@@ -77,25 +77,27 @@ def get_latest_for_album(owner_id, album_id):
         return None
     response_json = json.loads(response_text)
     max_date = read_previous_photo_date(owner_id + "_" + album_id)
-    latest_item = None
+
+    items_to_post = list()
     if 'response' in response_json:
         response = response_json['response']
         if 'items' in response:
             items = response['items']
-            for item in items:
+            last_10_items = items[:10]
+            for item in last_10_items:
                 if 'date' in item:
                     date = item['date']
-                    if date > max_date:
-                        max_date = date
-                        latest_item = item
+                    now_timestamp = bot_util.get_unix_timestamp()
+                    diff = now_timestamp - date
+                    if diff > 180:
+                        items_to_post.append(item)
 
-    write_previous_photo_date(max_date, owner_id + "_" + album_id)
-
-    photo_url = get_photo_url(latest_item)
-    if photo_url:
-        if is_photo_unique(_HASH_FILENAME, photo_url):
-            return build_message(latest_item)
-    return None
+    return items_to_post
+    # photo_url = get_photo_url(latest_item)
+    # if photo_url:
+    #     if is_photo_unique(_HASH_FILENAME, photo_url):
+    #         return build_message(latest_item)
+    # return None
 
 if __name__ == "__main__":
     while True:
@@ -109,8 +111,13 @@ if __name__ == "__main__":
                 owner_id = oa_id[0]
                 album_id = oa_id[1]
                 print owner_id, album_id
-                p = get_latest_for_album(owner_id, album_id)
-                if p is not None:
-                    broadcast_message(p)
+                goods = get_latest_for_album(owner_id, album_id)
+                if goods:
+                    for g in goods:
+                        photo_url = get_photo_url(g)
+                        if photo_url:
+                            if is_photo_unique(_HASH_FILENAME, photo_url):
+                                message = build_message(g)
+                                broadcast_message(message)
         time.sleep(30)
         print "tick"

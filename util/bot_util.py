@@ -4,6 +4,8 @@ import json
 import os
 import urllib
 import urllib2
+from datetime import datetime
+import calendar
 
 __author__ = 'Ilya'
 
@@ -24,6 +26,11 @@ def urlopen(url, data=None):
     except Exception as e:
         print "Exception", e, url, data
     return False
+
+
+def get_unix_timestamp():
+    d = datetime.utcnow()
+    return calendar.timegm(d.utctimetuple())
 
 
 def read_one_string_file(filename):
