@@ -74,9 +74,6 @@ class TelegramBot:
         if message:
 
             chat_id = telegram_bot_protocol.get_chat_id(message)
-            chat_id_string = str(chat_id) + "\n"
-            if bot_util.check_file_for_string(self._chats_file, chat_id_string):
-                open(self._chats_file, 'a').write(chat_id_string)
 
             text = telegram_bot_protocol.get_text(message)
 
