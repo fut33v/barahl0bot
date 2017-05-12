@@ -128,6 +128,20 @@ def get_goods_from_album(owner_id, album_id):
     return items_to_post
 
 
+def update_hash(_owner_id, _album_id):
+    u = build_photos_get_url(_owner_id, _album_id)
+    response_text = bot_util.urlopen(u)
+    if not response_text:
+        return None
+    response_json = json.loads(response_text)
+    if 'response' in response_json:
+        response = response_json['response']
+        if 'items' in response:
+            items = response['items']
+            last_10_items = items[:10]
+            for item in last_10_items:
+                photo_url = get_url_of_jpeg(item)
+                is_photo_unique(_HASH_FILENAME, photo_url)
 if __name__ == "__main__":
     while True:
         with open(barahl0bot.ALBUMS_FILENAME, "r") as albums_file:
