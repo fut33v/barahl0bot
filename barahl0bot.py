@@ -52,15 +52,31 @@ Github: https://github.com/fut33v/barahl0bot
             if user_id in admins:
                 command = text.split(' ')
                 if len(command) == 2:
-                    if command[0] == "/addalbum":
-                        m = REGEXP_ALBUM.match(command[1])
+                    command_type = command[0]
+                    command_argument = command[1]
+                    if command_type == "/addalbum" or command_type == "/removealbum":
+                        m = REGEXP_ALBUM.match(command_argument)
                         if m:
-                            album = m.group(1) + "\n"
-                            if bot_util.check_file_for_string(ALBUMS_FILENAME, album):
-                                open(ALBUMS_FILENAME, 'a').write(album)
-                                response = "Альбом добавлен"
-                            else:
-                                response = "Не, такой альбом есть уже"
+                            album = m.group(1)
+                            if command_type == "/addalbum":
+                                if bot_util.check_file_for_string(ALBUMS_FILENAME, album + "\n"):
+                                    open(ALBUMS_FILENAME, 'a').write(album + "\n")
+                                    response = "Альбом добавлен."
+                                else:
+                                    response = "Не, такой альбом есть уже."
+                            elif command_type == "/removealbum":
+                                if bot_util.check_file_for_string(ALBUMS_FILENAME, album + "\n"):
+                                    response = "Нету такого, не пизди."
+                                else:
+                                    temp = []
+                                    with open(ALBUMS_FILENAME) as fp:
+                                        temp = fp.read().split("\n")
+                                        temp = [x for x in temp if x != str(album)]
+                                    with open(ALBUMS_FILENAME, 'w') as fp:
+                                        for item in temp:
+                                            fp.write("%s\n" % item)
+                                    response = "Удолил."
+
                 elif len(command) == 1:
                     if command[0] == '/getchats':
                         response = str(len(bot_util.read_lines(self._chats_file)))
