@@ -118,7 +118,7 @@ def get_goods_from_album(owner_id, album_id):
                     photo_id = item['id']
                     now_timestamp = bot_util.get_unix_timestamp()
                     diff = now_timestamp - date
-                    if diff > 180:
+                    if  180 < diff < 86400:
                         photo_url = get_url_of_jpeg(item)
                         if is_photo_unique(_HASH_FILENAME, photo_url):
                             comments = get_photo_comments(owner_id, photo_id)
