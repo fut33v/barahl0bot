@@ -90,7 +90,7 @@ class TelegramBot:
     def _process_message(self, user_id, chat_id, text):
         raise NotImplemented
 
-    def send_response(self, chat_id, response, markdown=False):
+    def send_response(self, chat_id, response, markdown=False, html=False):
         if response is None or chat_id is None or response == '':
             return False
         if isinstance(response, unicode):
@@ -99,22 +99,22 @@ class TelegramBot:
             'chat_id': chat_id,
             'text': response,
         }
-        if markdown is True:
-            d['parse_mode'] = "Markdown"
+        if not (markdown and html):
+            if markdown is True:
+                d['parse_mode'] = "Markdown"
+            if html is True:
+                d['parse_mode'] = "HTML"
+
         return bot_util.urlopen(self._url_send_message, data=d)
 
     def send_to_channel(self, channel_id, response):
         if response is None or channel_id is None or response == '':
             return False
-        # _url = self._url_send_message + "?chat_id=@" + channel_id + "&text=" + response
-        # print _url
         data = {
             'text': response,
         }
         data = urllib.urlencode(data) + "&chat_id=@" + channel_id
-        print data
         urllib2.urlopen(self._url_send_message, data)
-        # return bot_util.urlopen(_url)
 
     def _read_previous_update_date(self):
         u = bot_util.read_one_string_file(self._PREVIOUS_UPDATE_DATE_FILENAME)

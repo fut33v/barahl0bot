@@ -12,7 +12,7 @@ def broadcast_message(message):
     lines = open(bot._chats_file, 'r').readlines()
     for l in lines:
         # l = int(l)
-        bot.send_response(l, message)
+        return bot.send_response(l, message, html=True)
 
 if __name__ == "__main__":
     m = "test"

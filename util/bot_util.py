@@ -14,7 +14,7 @@ def urlopen(url, data=None):
     try:
         if data is not None:
             data = urllib.urlencode(data)
-            print data
+            # print data
             urllib2.urlopen(url, data)
             return True
         else:
