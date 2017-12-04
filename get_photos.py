@@ -85,6 +85,73 @@ def make_numbers_bold(_text):
     return _text
 
 
+def build_message_simple(xyu):
+    if xyu is None:
+        return None
+
+    photo_dict = xyu[0]
+    comments_list = xyu[1]
+    album_name = xyu[2]
+    group_name = xyu[3]
+
+    if photo_dict is None:
+        return None
+
+    photo_url = get_url_of_jpeg(photo_dict)
+    user_id = ""
+    user_first_name = ""
+    user_last_name = ""
+    user_city = ""
+    if 'user_id' in photo_dict:
+        user_id = photo_dict['user_id']
+        if user_id == 100:
+            user_id = None
+        else:
+            user_id = str(user_id)
+
+    if user_id is not None:
+        u = get_user_info(user_id)
+        user_first_name = u[0]
+        user_last_name = u[1]
+        user_city = u[2]
+
+    comments = ""
+    if comments_list and user_id:
+        if len(comments_list) > 0:
+            for c in comments_list:
+                if 'from_id' and 'text' in c:
+                    if int(c['from_id']) == int(user_id) and c['text'] != "":
+                        comments += c['text'] + '\n'
+
+    text = ""
+    if 'text' in photo_dict:
+        text = photo_dict['text']
+    photo_id = ""
+    if 'id' in photo_dict:
+        photo_id = str(photo_dict['id'])
+
+    latest_product = u""
+    latest_product += "" + photo_url + u"\n"
+    if album_name is not None and group_name is not None:
+        latest_product += group_name + u"/" + album_name + u"\n\n"
+    if text != "":
+        text = text.lower()
+        text = text.replace('\n', ' ')
+        latest_product += u"Описание: " + text + "\n\n"
+    if comments != "":
+        comments = comments.lower()
+        comments = comments.replace('\n', ' ')
+        latest_product += u"Каменты: " + comments + "\n"
+    if user_id is not None and user_id != "":
+        latest_product += u"Продавец: https://vk.com/id" + user_id + u"\n" + user_first_name + u" " + user_last_name
+    if user_city != "":
+        latest_product += u" (" + user_city + u")"
+    latest_product += "\n"
+    latest_product += u"Фото: https://vk.com/photo" + owner_id + u"_" + photo_id + u"\n"
+
+    return latest_product
+
+
 def build_message(xyu):
     if xyu is None:
         return None
@@ -131,26 +198,26 @@ def build_message(xyu):
         photo_id = str(photo_dict['id'])
 
     latest_product = u""
-    latest_product += "" + photo_url + "\n"
+    latest_product += "" + photo_url + u"\n"
     if album_name is not None and group_name is not None:
-        latest_product += "<b>" + group_name + "/" + album_name + "</b>\n\n"
+        latest_product += u"<b>" + group_name + u"/" + album_name + u"</b>\n\n"
     if text != "":
         text = text.lower()
         text = text.replace('\n', ' ')
         # text = make_numbers_bold(text)
-        latest_product += u"<b>Описание:</b> " + text + "\n\n"
+        latest_product += u"<b>Описание:</b> " + text + u"\n\n"
     if comments != "":
         comments = comments.lower()
         comments = comments.replace('\n', ' ')
         # comments = make_numbers_bold(comments)
-        latest_product += u"<b>Каменты:</b> " + comments + "\n"
+        latest_product += u"<b>Каменты:</b> " + comments + u"\n"
     if user_id is not None and user_id != "":
         latest_product += u"<b>Продавец:</b> <a href=\"https://vk.com/id" + user_id + u"\">" + \
-                          user_first_name + " " + user_last_name
+                          user_first_name + u" " + user_last_name + u"</a>"
     if user_city != "":
-        latest_product += " (" + user_city + ")</a>"
+        latest_product += u" (" + user_city + u")"
     latest_product += "\n"
-    latest_product += u"<b>Фото:</b> https://vk.com/photo" + owner_id + "_" + photo_id + "\n"
+    latest_product += u"<b>Фото:</b> https://vk.com/photo" + owner_id + u"_" + photo_id + u"\n"
 
     return latest_product
 
@@ -189,7 +256,6 @@ def get_album_name(_owner_id, _album_id):
             response = response_json['response']
             if 'items' in response:
                 album_info = response['items'][0]
-                print album_info
                 album_name = album_info['title']
                 return album_name
     return None
@@ -200,7 +266,6 @@ def get_group_name(_owner_id):
     if _owner_id > 0:
         return None
     u = build_groups_get_by_id_url(-_owner_id)
-    print u
     response_text = bot_util.urlopen(u)
     if response_text:
         response_json = json.loads(response_text)
@@ -237,7 +302,7 @@ def get_goods_from_album(_owner_id, _album_id):
                     photo_id = item['id']
                     now_timestamp = bot_util.get_unix_timestamp()
                     diff = now_timestamp - date
-                    if  180 < diff < 86400:
+                    if 180 < diff < 86400:
                         photo_url = get_url_of_jpeg(item)
                         if is_photo_unique(_HASH_FILENAME, photo_url):
                             comments = get_photo_comments(_owner_id, photo_id)
@@ -282,5 +347,9 @@ if __name__ == "__main__":
                         message = build_message(g)
                         if not broadcast_message(message):
                             print "failed to send good", g
+                            message = build_message_simple(g)
+                            if not broadcast_message(message):
+                                print "failed to send simple message(", g
+
         time.sleep(30)
         print "tick"
