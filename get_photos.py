@@ -282,6 +282,7 @@ def get_goods_from_album(_owner_id, _album_id):
     u = build_photos_get_url(_owner_id, _album_id)
     response_text = bot_util.urlopen(u)
     if not response_text:
+        print "failed to get data!"
         return None
     response_json = json.loads(response_text)
     items_to_post = list()
@@ -341,15 +342,16 @@ if __name__ == "__main__":
                 album_id = oa_id[1]
                 print owner_id, album_id
                 goods = get_goods_from_album(owner_id, album_id)
-                print len(goods), "new goods"
-                if goods:
-                    for g in goods:
-                        message = build_message(g)
-                        if not broadcast_message(message):
-                            print "failed to send good", g
-                            message = build_message_simple(g)
+                if goods is not None:
+                    print len(goods), "new goods"
+                    if goods:
+                        for g in goods:
+                            message = build_message(g)
                             if not broadcast_message(message):
-                                print "failed to send simple message(", g
+                                print "failed to send good", g
+                                message = build_message_simple(g)
+                                if not broadcast_message(message):
+                                    print "failed to send simple message(", g
 
         time.sleep(30)
         print "tick"
