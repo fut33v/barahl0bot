@@ -67,22 +67,25 @@ def get_photo_comments(_owner_id, _photo_id):
 
 
 def make_numbers_bold(_text):
-    # for i, c in enumerate(_text):
-    #     if c.isdigit():
-    #         first_part = _text[:i]
-    #         last_part = _text[i+1:]
-    #         first_part + "<b>{x}</b>".format(x=c) + last_part
+    if not isinstance(_text, unicode):
+        return _text
+    _tokens = _text.split(u' ')
+    _tokens_bold = []
+    for t in _tokens:
+        is_digit = False
+        for c in t:
+            if c.isdigit():
+                is_digit = True
+        if is_digit:
+            _tokens_bold.append(u"<b>" + t + u"</b>")
+        else:
+            _tokens_bold.append(t)
 
-    numbers = re.findall('\d+', _text)
-    if len(numbers) > 0:
-        tmp = _text
-        for n in numbers:
-            # tmp = re.sub("\D({x})\D".format(x=str(n)), u"<b>{x}</b>".format(x=n), tmp)
-            tmp = re.sub("\D({x})\D".format(x=str(n)), u"<b>\g<1></b>", tmp)
-        _text = tmp
-        print _text
-        print numbers
-    return _text
+    result = unicode()
+    for t in _tokens_bold:
+        result += t + " "
+
+    return result
 
 
 def build_message_simple(xyu):
@@ -176,7 +179,7 @@ def build_message(xyu):
         else:
             user_id = str(user_id)
 
-    if user_id is not None:
+    if user_id is not None and user_id != "":
         u = get_user_info(user_id)
         user_first_name = u[0]
         user_last_name = u[1]
@@ -204,12 +207,12 @@ def build_message(xyu):
     if text != "":
         text = text.lower()
         text = text.replace('\n', ' ')
-        # text = make_numbers_bold(text)
+        text = make_numbers_bold(text)
         latest_product += u"<b>Описание:</b> " + text + u"\n\n"
     if comments != "":
         comments = comments.lower()
         comments = comments.replace('\n', ' ')
-        # comments = make_numbers_bold(comments)
+        comments = make_numbers_bold(comments)
         latest_product += u"<b>Каменты:</b> " + comments + u"\n"
     if user_id is not None and user_id != "":
         latest_product += u"<b>Продавец:</b> <a href=\"https://vk.com/id" + user_id + u"\">" + \
@@ -294,8 +297,6 @@ def get_goods_from_album(_owner_id, _album_id):
 
             album_name = get_album_name(_owner_id, _album_id)
             group_name = get_group_name(_owner_id)
-            print "group name : ", group_name
-            print "album name : ", album_name
 
             for item in last_10_items:
                 if 'date' in item and 'id' in item:
@@ -340,18 +341,20 @@ if __name__ == "__main__":
                     continue
                 owner_id = oa_id[0]
                 album_id = oa_id[1]
-                print owner_id, album_id
+
+                print "Getting photos from album:"
+                print "> https://vk.com/album" + owner_id + "_" + album_id
+
                 goods = get_goods_from_album(owner_id, album_id)
-                if goods is not None:
+                if goods:
                     print len(goods), "new goods"
-                    if goods:
-                        for g in goods:
-                            message = build_message(g)
+                    for g in goods:
+                        message = build_message(g)
+                        if not broadcast_message(message):
+                            print "failed to send good", g
+                            message = build_message_simple(g)
                             if not broadcast_message(message):
-                                print "failed to send good", g
-                                message = build_message_simple(g)
-                                if not broadcast_message(message):
-                                    print "failed to send simple message(", g
+                                print "failed to send simple message(", g
 
         time.sleep(30)
         print "tick"
