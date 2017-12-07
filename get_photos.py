@@ -12,7 +12,8 @@ import re
 _HASH_FILENAME = barahl0bot.DATA_DIRNAME + 'hash'
 _TOKEN_VK_FILENAME = barahl0bot.DATA_DIRNAME + 'token_vk'
 _TOKEN_VK = bot_util.read_one_string_file(_TOKEN_VK_FILENAME)
-RE_DIGITS_BOLD = re.compile("")
+_OWNER_ID_POST_BY_GROUP_ADMIN = 100
+_ALBUM_ID_WALL = "wall"
 
 
 def build_photos_get_url(_owner_id, _album_id):
@@ -88,122 +89,55 @@ def make_numbers_bold(_text):
     return result
 
 
-def build_message_simple(xyu):
-    if xyu is None:
+def build_message(_good):
+    if _good is None:
         return None
 
-    photo_dict = xyu[0]
-    comments_list = xyu[1]
-    album_name = xyu[2]
-    group_name = xyu[3]
-
-    if photo_dict is None:
+    _photo_item = _good['item']
+    if _photo_item is None:
         return None
 
-    photo_url = get_url_of_jpeg(photo_dict)
+    _comments = _good['comments']
+    _album_name = _good['album_name']
+    _group_name = _good['group_name']
+
+    photo_url = get_url_of_jpeg(_photo_item)
+
     user_id = ""
     user_first_name = ""
     user_last_name = ""
     user_city = ""
-    if 'user_id' in photo_dict:
-        user_id = photo_dict['user_id']
-        if user_id == 100:
+    if 'user_id' in _photo_item:
+        user_id = _photo_item['user_id']
+        if user_id == _OWNER_ID_POST_BY_GROUP_ADMIN:
             user_id = None
         else:
             user_id = str(user_id)
-
-    if user_id is not None:
-        u = get_user_info(user_id)
-        user_first_name = u[0]
-        user_last_name = u[1]
-        user_city = u[2]
+    if user_id is not None and user_id != "":
+        _user_info = get_user_info(user_id)
+        user_first_name = _user_info['first_name']
+        user_last_name = _user_info['last_name']
+        user_city = _user_info['city']
 
     comments = ""
-    if comments_list and user_id:
-        if len(comments_list) > 0:
-            for c in comments_list:
+    if _comments and user_id:
+        if len(_comments) > 0:
+            for c in _comments:
                 if 'from_id' and 'text' in c:
                     if int(c['from_id']) == int(user_id) and c['text'] != "":
                         comments += c['text'] + '\n'
 
     text = ""
-    if 'text' in photo_dict:
-        text = photo_dict['text']
+    if 'text' in _photo_item:
+        text = _photo_item['text']
     photo_id = ""
-    if 'id' in photo_dict:
-        photo_id = str(photo_dict['id'])
+    if 'id' in _photo_item:
+        photo_id = str(_photo_item['id'])
 
     latest_product = u""
     latest_product += "" + photo_url + u"\n"
-    if album_name is not None and group_name is not None:
-        latest_product += group_name + u"/" + album_name + u"\n\n"
-    if text != "":
-        text = text.lower()
-        text = text.replace('\n', ' ')
-        latest_product += u"Описание: " + text + "\n\n"
-    if comments != "":
-        comments = comments.lower()
-        comments = comments.replace('\n', ' ')
-        latest_product += u"Каменты: " + comments + "\n"
-    if user_id is not None and user_id != "":
-        latest_product += u"Продавец: https://vk.com/id" + user_id + u"\n" + user_first_name + u" " + user_last_name
-    if user_city != "":
-        latest_product += u" (" + user_city + u")"
-    latest_product += "\n"
-    latest_product += u"Фото: https://vk.com/photo" + owner_id + u"_" + photo_id + u"\n"
-
-    return latest_product
-
-
-def build_message(xyu):
-    if xyu is None:
-        return None
-
-    photo_dict = xyu[0]
-    comments_list = xyu[1]
-    album_name = xyu[2]
-    group_name = xyu[3]
-
-    if photo_dict is None:
-        return None
-
-    photo_url = get_url_of_jpeg(photo_dict)
-    user_id = ""
-    user_first_name = ""
-    user_last_name = ""
-    user_city = ""
-    if 'user_id' in photo_dict:
-        user_id = photo_dict['user_id']
-        if user_id == 100:
-            user_id = None
-        else:
-            user_id = str(user_id)
-
-    if user_id is not None and user_id != "":
-        u = get_user_info(user_id)
-        user_first_name = u[0]
-        user_last_name = u[1]
-        user_city = u[2]
-
-    comments = ""
-    if comments_list and user_id:
-        if len(comments_list) > 0:
-            for c in comments_list:
-                if 'from_id' and 'text' in c:
-                    if int(c['from_id']) == int(user_id) and c['text'] != "":
-                        comments += c['text'] + '\n'
-
-    text = ""
-    if 'text' in photo_dict:
-        text = photo_dict['text']
-    photo_id = ""
-    if 'id' in photo_dict:
-        photo_id = str(photo_dict['id'])
-
-    latest_product = u""
-    latest_product += "" + photo_url + u"\n"
-    if album_name is not None and group_name is not None:
-        latest_product += u"<b>" + group_name + u"/" + album_name + u"</b>\n\n"
+    if _album_name is not None and _group_name is not None:
+        latest_product += u"<b>" + _group_name + u"/" + _album_name + u"</b>\n\n"
     if text != "":
         text = text.lower()
         text = text.replace('\n', ' ')
@@ -234,19 +168,19 @@ def get_user_info(_user_id):
             response = response_json['response']
             if len(response) == 0:
                 return None
-            peedor = response[0]
+            _user_info = response[0]
             first_name = ""
             last_name = ""
             city = ""
-            if "first_name" in peedor:
-                first_name = peedor["first_name"]
-            if "last_name" in peedor:
-                last_name = peedor["last_name"]
-            if "city" in peedor:
-                if "title" in peedor["city"]:
-                    city = peedor["city"]["title"]
-            peedor = (first_name, last_name, city)
-            return peedor
+            if "first_name" in _user_info:
+                first_name = _user_info["first_name"]
+            if "last_name" in _user_info:
+                last_name = _user_info["last_name"]
+            if "city" in _user_info:
+                if "title" in _user_info["city"]:
+                    city = _user_info["city"]["title"]
+            _user_info = {'first_name': first_name, 'last_name': last_name, 'city': city}
+            return _user_info
     return None
 
 
@@ -308,7 +242,16 @@ def get_goods_from_album(_owner_id, _album_id):
                         photo_url = get_url_of_jpeg(item)
                         if is_photo_unique(_HASH_FILENAME, photo_url):
                             comments = get_photo_comments(_owner_id, photo_id)
-                            items_to_post.append((item, comments, album_name, group_name))
+                            if int(_owner_id) > 0:
+                                item['user_id'] = _owner_id
+                                user_info = get_user_info(_owner_id)
+                                group_name = unicode(user_info['first_name']) + u" " + unicode(user_info['last_name'])
+                                if _album_id == _ALBUM_ID_WALL:
+                                    album_name = u"Фото со стены"
+                            items_to_post.append({"item": item,
+                                                  'comments': comments,
+                                                  'album_name': album_name,
+                                                  'group_name': group_name})
                             time.sleep(1)
 
     return items_to_post
@@ -341,6 +284,8 @@ if __name__ == "__main__":
                     continue
                 owner_id = oa_id[0]
                 album_id = oa_id[1]
+                if album_id == "00":
+                    album_id = "wall"
 
                 print "Getting photos from album:"
                 print "> https://vk.com/album" + owner_id + "_" + album_id
@@ -352,9 +297,5 @@ if __name__ == "__main__":
                         message = build_message(g)
                         if not broadcast_message(message):
                             print "failed to send good", g
-                            message = build_message_simple(g)
-                            if not broadcast_message(message):
-                                print "failed to send simple message(", g
-
         time.sleep(30)
         print "tick"
