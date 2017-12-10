@@ -1,33 +1,33 @@
 # coding=utf-8
 
 import json
+import time
 
 import barahl0bot
 from broadcast import broadcast_message
 from check_photo import is_photo_unique
 from util import bot_util
-import time
-import re
 
 _HASH_FILENAME = barahl0bot.DATA_DIRNAME + 'hash'
 _TOKEN_VK_FILENAME = barahl0bot.DATA_DIRNAME + 'token_vk'
 _TOKEN_VK = bot_util.read_one_string_file(_TOKEN_VK_FILENAME)
 _OWNER_ID_POST_BY_GROUP_ADMIN = 100
+_LAST_ITEMS_COUNT = 20
 _ALBUM_ID_WALL = "wall"
 
 
 def build_photos_get_url(_owner_id, _album_id):
-    return "https://api.vk.com/method/photos.get?album_id={a}&owner_id={o}&rev=1&v=5.63".format(a=_album_id,
-                                                                                                o=_owner_id)
+    return "https://api.vk.com/method/photos.get?album_id={a}&owner_id={o}&extended=1&rev=1&v=5.69".format(a=_album_id,
+                                                                                                           o=_owner_id)
 
 
 def build_photos_get_comments_url(_owner_id, _photo_id, _token):
-    return "https://api.vk.com/method/photos.getComments?owner_id={o}&photo_id={i}&v=5.63&access_token" \
+    return "https://api.vk.com/method/photos.getComments?owner_id={o}&photo_id={i}&v=5.69&access_token" \
            "={t}".format(t=_token, o=_owner_id, i=_photo_id)
 
 
 def build_photos_get_albums_url(_owner_id, _album_id, _token):
-    return "https://api.vk.com/method/photos.getAlbums?album_ids={a}&owner_id={o}&v=5.63&access_token={t}". \
+    return "https://api.vk.com/method/photos.getAlbums?album_ids={a}&owner_id={o}&v=5.69&access_token={t}". \
         format(a=_album_id, o=_owner_id, t=_token)
 
 
@@ -37,6 +37,10 @@ def build_groups_get_by_id_url(_group_id):
 
 def build_users_get_url(_user_id):
     return "https://api.vk.com/method/users.get?user_ids={u}&fields=city&v=5.63".format(u=_user_id)
+
+
+def build_wall_get_by_id_url(_posts):
+    return "https://api.vk.com/method/wall.getById?posts={p}&v=5.69".format(p=_posts)
 
 
 def get_url_of_jpeg(latest_photo):
@@ -87,76 +91,6 @@ def make_numbers_bold(_text):
         result += t + " "
 
     return result
-
-
-def build_message(_good):
-    if _good is None:
-        return None
-
-    _photo_item = _good['item']
-    if _photo_item is None:
-        return None
-
-    _comments = _good['comments']
-    _album_name = _good['album_name']
-    _group_name = _good['group_name']
-
-    photo_url = get_url_of_jpeg(_photo_item)
-
-    user_id = ""
-    user_first_name = ""
-    user_last_name = ""
-    user_city = ""
-    if 'user_id' in _photo_item:
-        user_id = _photo_item['user_id']
-        if user_id == _OWNER_ID_POST_BY_GROUP_ADMIN:
-            user_id = None
-        else:
-            user_id = str(user_id)
-    if user_id is not None and user_id != "":
-        _user_info = get_user_info(user_id)
-        user_first_name = _user_info['first_name']
-        user_last_name = _user_info['last_name']
-        user_city = _user_info['city']
-
-    comments = ""
-    if _comments and user_id:
-        if len(_comments) > 0:
-            for c in _comments:
-                if 'from_id' and 'text' in c:
-                    if int(c['from_id']) == int(user_id) and c['text'] != "":
-                        comments += c['text'] + '\n'
-
-    text = ""
-    if 'text' in _photo_item:
-        text = _photo_item['text']
-    photo_id = ""
-    if 'id' in _photo_item:
-        photo_id = str(_photo_item['id'])
-
-    latest_product = u""
-    latest_product += "" + photo_url + u"\n"
-    if _album_name is not None and _group_name is not None:
-        latest_product += u"<b>" + _group_name + u"/" + _album_name + u"</b>\n\n"
-    if text != "":
-        text = text.lower()
-        text = text.replace('\n', ' ')
-        text = make_numbers_bold(text)
-        latest_product += u"<b>Описание:</b> " + text + u"\n\n"
-    if comments != "":
-        comments = comments.lower()
-        comments = comments.replace('\n', ' ')
-        comments = make_numbers_bold(comments)
-        latest_product += u"<b>Каменты:</b> " + comments + u"\n"
-    if user_id is not None and user_id != "":
-        latest_product += u"<b>Продавец:</b> <a href=\"https://vk.com/id" + user_id + u"\">" + \
-                          user_first_name + u" " + user_last_name + u"</a>"
-    if user_city != "":
-        latest_product += u" (" + user_city + u")"
-    latest_product += "\n"
-    latest_product += u"<b>Фото:</b> https://vk.com/photo" + owner_id + u"_" + photo_id + u"\n"
-
-    return latest_product
 
 
 def get_user_info(_user_id):
@@ -215,6 +149,98 @@ def get_group_name(_owner_id):
     return None
 
 
+def get_post_text(_owner_id, _post_id):
+    if int(_owner_id) < 0:
+        return None
+    _post_id = str(_post_id)
+    full_post_id = _owner_id + "_" + _post_id
+    u = build_wall_get_by_id_url(full_post_id)
+    response_text = bot_util.urlopen(u)
+    if response_text:
+        response_json = json.loads(response_text)
+        if 'response' in response_json:
+            response = response_json['response']
+            if len(response) == 0:
+                return None
+            if 'text' in response[0]:
+                return response[0]['text']
+    return None
+
+
+def build_message(_good):
+    if _good is None:
+        return None
+
+    _photo_item = _good['item']
+    if _photo_item is None:
+        return None
+
+    _comments = _good['comments']
+    _album_name = _good['album_name']
+    _group_name = _good['group_name']
+
+    photo_url = get_url_of_jpeg(_photo_item)
+
+    user_id = ""
+    user_first_name = ""
+    user_last_name = ""
+    user_city = ""
+    if 'user_id' in _photo_item:
+        user_id = _photo_item['user_id']
+        if user_id == _OWNER_ID_POST_BY_GROUP_ADMIN:
+            user_id = None
+        else:
+            user_id = str(user_id)
+    if user_id is not None and user_id != "":
+        _user_info = get_user_info(user_id)
+        user_first_name = _user_info['first_name']
+        user_last_name = _user_info['last_name']
+        user_city = _user_info['city']
+
+    comments = ""
+    if _comments and user_id:
+        if len(_comments) > 0:
+            for c in _comments:
+                if 'from_id' and 'text' in c:
+                    if int(c['from_id']) == int(user_id) and c['text'] != "":
+                        comments += c['text'] + '\n'
+
+    text = ""
+    if 'text' in _photo_item:
+        text = _photo_item['text']
+        if text == u'' and user_id:
+            if 'post_id' in _photo_item:
+                post_id = _photo_item['post_id']
+                text = get_post_text(user_id, post_id)
+    photo_id = ""
+    if 'id' in _photo_item:
+        photo_id = str(_photo_item['id'])
+
+    latest_product = u""
+    latest_product += "" + photo_url + u"\n"
+    if _album_name is not None and _group_name is not None:
+        latest_product += u"<b>" + _group_name + u"/" + _album_name + u"</b>\n\n"
+    if text != "":
+        text = text.lower()
+        text = text.replace('\n', ' ')
+        text = make_numbers_bold(text)
+        latest_product += u"<b>Описание:</b> " + text + u"\n\n"
+    if comments != "":
+        comments = comments.lower()
+        comments = comments.replace('\n', ' ')
+        comments = make_numbers_bold(comments)
+        latest_product += u"<b>Каменты:</b> " + comments + u"\n"
+    if user_id is not None and user_id != "":
+        latest_product += u"<b>Продавец:</b> <a href=\"https://vk.com/id" + user_id + u"\">" + \
+                          user_first_name + u" " + user_last_name + u"</a>"
+    if user_city != "":
+        latest_product += u" (" + user_city + u")"
+    latest_product += "\n"
+    latest_product += u"<b>Фото:</b> https://vk.com/photo" + owner_id + u"_" + photo_id + u"\n"
+
+    return latest_product
+
+
 def get_goods_from_album(_owner_id, _album_id):
     u = build_photos_get_url(_owner_id, _album_id)
     response_text = bot_util.urlopen(u)
@@ -227,12 +253,12 @@ def get_goods_from_album(_owner_id, _album_id):
         response = response_json['response']
         if 'items' in response:
             items = response['items']
-            last_10_items = items[:10]
+            last_items = items[:_LAST_ITEMS_COUNT]
 
             album_name = get_album_name(_owner_id, _album_id)
             group_name = get_group_name(_owner_id)
 
-            for item in last_10_items:
+            for item in last_items:
                 if 'date' in item and 'id' in item:
                     date = item['date']
                     photo_id = item['id']
