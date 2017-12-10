@@ -1,6 +1,7 @@
 # coding=utf-8
 
 import json
+import re
 import time
 
 import barahl0bot
@@ -14,6 +15,8 @@ _TOKEN_VK = bot_util.read_one_string_file(_TOKEN_VK_FILENAME)
 _OWNER_ID_POST_BY_GROUP_ADMIN = 100
 _LAST_ITEMS_COUNT = 20
 _ALBUM_ID_WALL = "wall"
+_REGEX_HTTP = re.compile("http")
+_REGEX_HTTPS = re.compile("https")
 
 
 def build_photos_get_url(_owner_id, _album_id):
@@ -78,9 +81,15 @@ def make_numbers_bold(_text):
     _tokens_bold = []
     for t in _tokens:
         is_digit = False
+        # is_link = False
         for c in t:
             if c.isdigit():
                 is_digit = True
+        h1 = _REGEX_HTTP.findall(t)
+        h2 = _REGEX_HTTPS.findall(t)
+        if len(h1) > 0 or len(h2) > 0:
+            # is_link = True
+            is_digit = False
         if is_digit:
             _tokens_bold.append(u"<b>" + t + u"</b>")
         else:
@@ -236,7 +245,8 @@ def build_message(_good):
     if user_city != "":
         latest_product += u" (" + user_city + u")"
     latest_product += "\n"
-    latest_product += u"<b>Фото:</b> https://vk.com/photo" + owner_id + u"_" + photo_id + u"\n"
+    nice_photo_url = u"https://vk.com/photo" + owner_id + u"_" + photo_id
+    latest_product += u"<b>Фото:</b>" + nice_photo_url + u"\n"
 
     return latest_product
 
