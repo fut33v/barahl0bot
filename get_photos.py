@@ -19,9 +19,9 @@ _REGEX_HTTP = re.compile("http")
 _REGEX_HTTPS = re.compile("https")
 
 
-def build_photos_get_url(_owner_id, _album_id):
-    return "https://api.vk.com/method/photos.get?album_id={a}&owner_id={o}&extended=1&rev=1&v=5.69".format(a=_album_id,
-                                                                                                           o=_owner_id)
+def build_photos_get_url(_owner_id, _album_id, _token):
+    return "https://api.vk.com/method/photos.get?album_id={a}&owner_id={o}&extended=1&rev=1&v=5.69&access_token={t}".format(a=_album_id,
+                                                                                                           o=_owner_id, t=_token)
 
 
 def build_photos_get_comments_url(_owner_id, _photo_id, _token):
@@ -202,9 +202,10 @@ def build_message(_good):
             user_id = str(user_id)
     if user_id is not None and user_id != "":
         _user_info = get_user_info(user_id)
-        user_first_name = _user_info['first_name']
-        user_last_name = _user_info['last_name']
-        user_city = _user_info['city']
+        if _user_info is not None:
+             user_first_name = _user_info['first_name']
+             user_last_name = _user_info['last_name']
+             user_city = _user_info['city']
 
     comments = ""
     if _comments and user_id:
@@ -252,7 +253,7 @@ def build_message(_good):
 
 
 def get_goods_from_album(_owner_id, _album_id):
-    u = build_photos_get_url(_owner_id, _album_id)
+    u = build_photos_get_url(_owner_id, _album_id, _TOKEN_VK)
     response_text = bot_util.urlopen(u)
     if not response_text:
         print "failed to get data!"
