@@ -38,8 +38,9 @@ def build_groups_get_by_id_url(_group_id):
     return "https://api.vk.com/method/groups.getById?group_id={g}&v=5.63".format(g=_group_id)
 
 
-def build_users_get_url(_user_id):
-    return "https://api.vk.com/method/users.get?user_ids={u}&fields=city&v=5.63".format(u=_user_id)
+def build_users_get_url(_user_id, _token):
+    return "https://api.vk.com/method/users.get?user_ids={u}&fields=city&v=5.63&access_token={t}".\
+        format(u=_user_id, t=_token)
 
 
 def build_wall_get_by_id_url(_posts):
@@ -103,7 +104,7 @@ def make_numbers_bold(_text):
 
 
 def get_user_info(_user_id):
-    u = build_users_get_url(_user_id)
+    u = build_users_get_url(_user_id, _TOKEN_VK)
     response_text = bot_util.urlopen(u)
     if response_text:
         response_json = json.loads(response_text)
