@@ -34,8 +34,8 @@ def build_photos_get_albums_url(_owner_id, _album_id, _token):
         format(a=_album_id, o=_owner_id, t=_token)
 
 
-def build_groups_get_by_id_url(_group_id):
-    return "https://api.vk.com/method/groups.getById?group_id={g}&v=5.63".format(g=_group_id)
+def build_groups_get_by_id_url(_group_id, _token):
+    return "https://api.vk.com/method/groups.getById?group_id={g}&v=5.63&access_token={t}".format(g=_group_id, t=_token)
 
 
 def build_users_get_url(_user_id, _token):
@@ -146,7 +146,7 @@ def get_group_name(_owner_id):
     _owner_id = int(_owner_id)
     if _owner_id > 0:
         return None
-    u = build_groups_get_by_id_url(-_owner_id)
+    u = build_groups_get_by_id_url(-_owner_id, _TOKEN_VK)
     response_text = bot_util.urlopen(u)
     if response_text:
         response_json = json.loads(response_text)
