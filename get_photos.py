@@ -257,7 +257,7 @@ def get_goods_from_album(_owner_id, _album_id):
     u = build_photos_get_url(_owner_id, _album_id, _TOKEN_VK)
     response_text = bot_util.urlopen(u)
     if not response_text:
-        print "failed to get data!"
+        print("failed to get data!")
         return None
     response_json = json.loads(response_text)
     items_to_post = list()
@@ -325,15 +325,15 @@ if __name__ == "__main__":
                 if album_id == "00":
                     album_id = "wall"
 
-                print "Getting photos from album:"
-                print "> https://vk.com/album" + owner_id + "_" + album_id
+                print("Getting photos from album:")
+                print("> https://vk.com/album" + owner_id + "_" + album_id)
 
                 goods = get_goods_from_album(owner_id, album_id)
                 if goods:
-                    print len(goods), "new goods"
+                    print(len(goods), "new goods")
                     for g in goods:
                         message = build_message(g)
                         if not broadcast_message(message):
-                            print "failed to send good", g
+                            print("failed to send good", g)
         time.sleep(30)
-        print "tick"
+        print("tick")

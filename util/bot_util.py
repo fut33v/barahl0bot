@@ -1,9 +1,8 @@
 from functools import partial
-import httplib
 import json
 import os
-import urllib
-import urllib2
+import urllib.request, urllib.parse, urllib.error
+import urllib.request, urllib.error, urllib.parse
 from datetime import datetime
 import calendar
 
@@ -13,20 +12,19 @@ __author__ = 'Ilya'
 def urlopen(url, data=None):
     try:
         if data is not None:
-            data = urllib.urlencode(data)
+            data = urllib.parse.urlencode(data)
             # print data
-            urllib2.urlopen(url, data)
+            urllib.request.urlopen(url, data)
             return True
         else:
-            return urllib2.urlopen(url, data).read()
-    except urllib2.HTTPError as e:
-        print "HTTPError", e, url, data
-    except urllib2.URLError as e:
-        print "URLError", e, url, data
+            return urllib.request.urlopen(url, data).read()
+    except urllib.error.HTTPError as e:
+        print(("HTTPError", e, url, data))
+    except urllib.error.URLError as e:
+        print(("URLError", e, url, data))
     except Exception as e:
-        print "Exception", e, url, data
+        print(("Exception", e, url, data))
     return False
-
 
 def get_unix_timestamp():
     d = datetime.utcnow()

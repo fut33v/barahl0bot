@@ -24,5 +24,5 @@ if __name__ == "__main__":
         sha = hashlib.sha256()
         sha.update(photo)
         h = sha.hexdigest()
-        print h
+        print(h)
 

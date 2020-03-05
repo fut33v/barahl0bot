@@ -2,7 +2,10 @@
 import re
 
 from util import bot_util
-from telegram_bot.telegram_bot import TelegramBot
+
+from telegram.ext import Updater, CommandHandler
+import telegram.ext
+
 
 __author__ = 'fut33v'
 
@@ -24,74 +27,94 @@ with open(ADMIN_FILENAME) as admins_file:
 REGEXP_ALBUM = re.compile("http[s]?://vk.com/album(-?\d*_\d*)")
 
 
-class BarahloBot(TelegramBot):
-    def __init__(self, token, name):
-        TelegramBot.__init__(self, token, name)
+def start_handler(update, context):
+    response = """
+    
+    С помощью этого бота можно: 
+    
+    + добавить объявление на канал *@barahlochannel*, 
+    + узнать список альбомов источников канала. 
 
-    def _process_message(self, user_id, chat_id, text):
-        if text == '/start':
-            response = """
-Я буду присылать тебе новые товары из велобарахолок.
-Не надо мне ничего писать, я ничего тебе не отвечу, просто жди новых фоток.
+    *Github:* https://github.com/fut33v/barahl0bot
 
-Github: https://github.com/fut33v/barahl0bot
+    *Техподдержка:* @fut33v
+    
+"""
 
-Техподдержка: @fut33v
+    context.bot.send_message(update.effective_chat.id, response, parse_mode=telegram.ParseMode.MARKDOWN)
 
-Если я затупил, понажимай /start или пиши @fut33v
-            """
+
+def get_albums_handler(update, context):
+    response = "Сегодня без альбомов, братан"
+    albums = bot_util.read_lines(ALBUMS_FILENAME)
+    if albums:
+        response = ""
+        for a in albums:
+            response += "https://vk.com/album" + a
+
+    context.bot.send_message(update.effective_chat.id, response)
+
+
+def add_album_handler(update, context):
+    if len(context.args) == 0:
+        return
+    for album_candidate in context.args:
+        print(album_candidate)
+        m = REGEXP_ALBUM.match(album_candidate)
+        if m:
+            album = m.group(1)
+            if bot_util.check_file_for_string(ALBUMS_FILENAME, album + "\n"):
+                open(ALBUMS_FILENAME, 'a').write(album + "\n")
+                response = "Альбом добавлен."
+            else:
+                response = "Не, такой альбом ({}) есть уже.".format(album_candidate)
         else:
-            response = "Чего блять?"
-            if text == "/getalbums":
-                albums = bot_util.read_lines(ALBUMS_FILENAME)
-                if albums:
-                    response = ""
-                    for a in albums:
-                        response += "https://vk.com/album" + a
-            # admin stuff
-            if user_id in admins:
-                command = text.split(' ')
-                if len(command) == 2:
-                    command_type = command[0]
-                    command_argument = command[1]
-                    if command_type == "/addalbum" or command_type == "/removealbum":
-                        m = REGEXP_ALBUM.match(command_argument)
-                        if m:
-                            album = m.group(1)
-                            if command_type == "/addalbum":
-                                if bot_util.check_file_for_string(ALBUMS_FILENAME, album + "\n"):
-                                    open(ALBUMS_FILENAME, 'a').write(album + "\n")
-                                    response = "Альбом добавлен."
-                                else:
-                                    response = "Не, такой альбом есть уже."
-                            elif command_type == "/removealbum":
-                                if bot_util.check_file_for_string(ALBUMS_FILENAME, album + "\n"):
-                                    response = "Нету такого, не пизди."
-                                else:
-                                    temp = []
-                                    with open(ALBUMS_FILENAME) as fp:
-                                        temp = fp.read().split("\n")
-                                        temp = [x for x in temp if x != str(album)]
-                                    with open(ALBUMS_FILENAME, 'w') as fp:
-                                        for item in temp:
-                                            fp.write("%s\n" % item)
-                                    response = "Удолил."
+            response = "Не удалось распарсить ссылку ({})".format(album_candidate)
 
-                elif len(command) == 1:
-                    if command[0] == '/getchats':
-                        response = str(len(bot_util.read_lines(self._chats_file)))
-                    if command[0] == '/getusers':
-                        response = ""
-                        usernames = bot_util.read_lines(self._usernames_file)
-                        for u in usernames:
-                            response += "@" + u
+        context.bot.send_message(update.effective_chat.id, response)
 
-        if response:
-            success = self.send_response(chat_id, response=response)
-            return success
-        return False
+
+def remove_album_handler(update, context):
+    if len(context.args) == 0:
+        return
+    for album_candidate in context.args:
+        print(album_candidate)
+        m = REGEXP_ALBUM.match(album_candidate)
+        if m:
+            album = m.group(1)
+            if bot_util.check_file_for_string(ALBUMS_FILENAME, album + "\n"):
+                response = "Такого альбома найдено не было."
+            else:
+                temp = []
+                with open(ALBUMS_FILENAME) as fp:
+                    temp = fp.read().split("\n")
+                    temp = [x for x in temp if x != str(album) and x != ""]
+                with open(ALBUMS_FILENAME, 'w') as fp:
+                    for item in temp:
+                        fp.write("%s\n" % item)
+                response = "Удалил."
+        else:
+            response = "Не удалось распарсить ссылку ({})".format(album_candidate)
+
+        context.bot.send_message(update.effective_chat.id, response)
+
+
+def add_item_handler(update, context):
+    return ""
+
 
 if __name__ == "__main__":
-    t = bot_util.read_one_string_file(TOKEN_FILENAME)
-    bot = BarahloBot(t, name="barahl0bot")
-    bot.start_poll()
+    token = bot_util.read_one_string_file(TOKEN_FILENAME)
+    print(token)
+    updater = Updater(token, use_context=True)
+    dispatcher = updater.dispatcher
+
+    dispatcher.add_handler(CommandHandler('start', start_handler))
+    dispatcher.add_handler(CommandHandler('getalbums', get_albums_handler))
+    dispatcher.add_handler(CommandHandler('addalbum', add_album_handler))
+    dispatcher.add_handler(CommandHandler('removealbum', remove_album_handler))
+    dispatcher.add_handler(CommandHandler('additem', add_item_handler))
+
+    updater.start_polling()
+    updater.idle()
+
