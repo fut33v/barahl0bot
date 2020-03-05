@@ -3,8 +3,9 @@ import re
 
 from util import bot_util
 
-from telegram.ext import Updater, CommandHandler
+from telegram.ext import Updater, CommandHandler, ConversationHandler, Handler, MessageHandler, Filters
 import telegram.ext
+from enum import Enum
 
 
 __author__ = 'fut33v'
@@ -13,6 +14,7 @@ DATA_DIRNAME = "data/"
 TOKEN_FILENAME = DATA_DIRNAME + "token"
 ALBUMS_FILENAME = DATA_DIRNAME + 'albums'
 ADMIN_FILENAME = DATA_DIRNAME + 'admin'
+CHANNEL_FILENAME = DATA_DIRNAME + 'channel'
 
 admins = None
 with open(ADMIN_FILENAME) as admins_file:
@@ -24,6 +26,7 @@ with open(ADMIN_FILENAME) as admins_file:
         admins = set(admins)
 
 
+CHANNEL = bot_util.read_one_string_file(CHANNEL_FILENAME)
 REGEXP_ALBUM = re.compile("http[s]?://vk.com/album(-?\d*_\d*)")
 
 
@@ -99,7 +102,49 @@ def remove_album_handler(update, context):
         context.bot.send_message(update.effective_chat.id, response)
 
 
+class UserState(Enum):
+    CHILLING = 0
+    WAITING_FOR_PHOTO = 1
+    WAITING_FOR_TEXT = 2
+
+
+ACTIVE_USERS = {}
+
+
 def add_item_handler(update, context):
+    message = "Пришли фото или альбом."
+    context.bot.send_message(update.effective_chat.id, message)
+    return UserState.WAITING_FOR_PHOTO
+
+
+def add_item_chilling(update, context):
+    return ""
+
+
+def add_item_waiting_for_photo(update, context):
+    message = "Теперь пиши описание товара."
+    context.bot.send_message(update.effective_chat.id, message)
+
+    # save photo to some user related dictionary
+    ACTIVE_USERS[update.effective_user] = update.effective_message
+
+    return UserState.WAITING_FOR_TEXT
+
+
+def add_item_waiting_for_text(update, context):
+    description = update.effective_message.text
+    # get photo for this user and send photo+desc to channel
+    if update.effective_user.username:
+        description = "@" + update.effective_user.username + "\n" + description
+    photo_message = ACTIVE_USERS[update.effective_user]
+
+    context.bot.send_photo(chat_id=CHANNEL, photo=photo_message.photo[-1].file_id, caption=description[:1024])
+    # context.bot.send_message(CHANNEL, description)
+
+    return ConversationHandler.END
+
+
+def cancel_handler(update, context):
     return ""
 
 
@@ -113,7 +158,22 @@ if __name__ == "__main__":
     dispatcher.add_handler(CommandHandler('getalbums', get_albums_handler))
     dispatcher.add_handler(CommandHandler('addalbum', add_album_handler))
     dispatcher.add_handler(CommandHandler('removealbum', remove_album_handler))
-    dispatcher.add_handler(CommandHandler('additem', add_item_handler))
+
+    additem_ch = CommandHandler('additem', add_item_handler)
+    fallbacks = [CommandHandler('cancel', cancel_handler)]
+    print(type(fallbacks))
+    dispatcher.add_handler(
+        ConversationHandler(entry_points=[additem_ch],
+                            states={
+                                UserState.CHILLING: [Handler(add_item_chilling)],
+                                UserState.WAITING_FOR_PHOTO: [MessageHandler(
+                                    callback=add_item_waiting_for_photo, filters=Filters.photo)],
+                                UserState.WAITING_FOR_TEXT: [MessageHandler(
+                                    callback=add_item_waiting_for_text, filters=Filters.text)]
+                            },
+                            fallbacks=[CommandHandler('cancel', cancel_handler)],
+        )
+    )
 
     updater.start_polling()
     updater.idle()
