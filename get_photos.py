@@ -7,6 +7,8 @@ import logging
 import datetime
 import os
 
+import vk_api
+
 import barahl0bot
 from check_photo import is_photo_unique
 from util import bot_util
@@ -26,13 +28,13 @@ _TOO_OLD_FOR_PHOTO_SECONDS = 24*60*60
 
 _CHANNELS = barahl0bot.CHANNELS
 
+_VK_SESSION = vk_api.VkApi(token=_TOKEN_VK)
+_VK_API = _VK_SESSION.get_api()
+
+
+
 def build_album_url(_owner_id, _album_id):
     return "https://vk.com/album{}_{}".format(_owner_id, _album_id)
-
-
-def build_photos_get_url(_owner_id, _album_id, _token):
-    return "https://api.vk.com/method/photos.get?album_id={a}&owner_id={o}&extended=1&rev=1&v=5.69&access_token={t}".format(a=_album_id,
-                                                                                                           o=_owner_id, t=_token)
 
 
 def build_photos_get_comments_url(_owner_id, _photo_id, _token):
@@ -277,30 +279,17 @@ def build_message(_good):
 
 
 def get_goods_from_album(_owner_id, _album_id):
-    u = build_photos_get_url(_owner_id, _album_id, _TOKEN_VK)
-    response_text = bot_util.urlopen(u)
-    if not response_text:
-        logging.error("failed to photos.get!")
-        return None
-    response_json = json.loads(response_text)
+    response = _VK_API.photos.get(album_id=_album_id, owner_id=_owner_id, extended=1, rev=1, v=5.69)
+
     items_to_post = list()
-
-    if 'response' not in response_json:
-        logging.error("no 'response' in dictionary for photos.get")
-        logging.error(response_json)
-        return None
-
-    response = response_json['response']
 
     if 'items' not in response:
         logging.error("no 'items' in response for photos.get")
-        logging.error(response_json)
+        logging.error(response)
         return None
 
     items = response['items']
     last_items = items[:_LAST_ITEMS_COUNT]
-
-    # logging.debug('got items in album {}'.format(build_album_url(_owner_id, _album_id)))
 
     album_name = get_album_name(_owner_id, _album_id)
     group_name = get_group_name(_owner_id)
@@ -335,19 +324,16 @@ def get_goods_from_album(_owner_id, _album_id):
 
 
 def update_hash(_owner_id, _album_id):
-    u = build_photos_get_url(_owner_id, _album_id)
-    response_text = bot_util.urlopen(u)
-    if not response_text:
+    response = _VK_API.photos.get(album_id=_album_id, owner_id=_owner_id, extended=1, rev=1, v=5.69)
+    if 'items' not in response:
+        logging.error("no 'items' in response for photos.get")
+        logging.error(response)
         return None
-    response_json = json.loads(response_text)
-    if 'response' in response_json:
-        response = response_json['response']
-        if 'items' in response:
-            items = response['items']
-            last_10_items = items[:10]
-            for item in last_10_items:
-                photo_url = get_url_of_jpeg(item)
-                is_photo_unique(_HASH_FILENAME, photo_url)
+    items = response['items']
+    last_10_items = items[:10]
+    for item in last_10_items:
+        photo_url = get_url_of_jpeg(item)
+        is_photo_unique(_HASH_FILENAME, photo_url)
 
 
 _LOGS_DIR = 'log'
@@ -370,6 +356,8 @@ if __name__ == "__main__":
     # ch = logging.StreamHandler()
     # logging.getLogger().addHandler(ch)
     # ch.setLevel(logging.INFO)
+
+
 
     while True:
         with open(barahl0bot.ALBUMS_FILENAME, "r") as albums_file:

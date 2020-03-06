@@ -4,6 +4,8 @@
   "channels": ["@barahl0"],
   "admins": ["fut33v"],
   "seconds_to_sleep": 120,
-  "ad_per_day_per_user": 2
+  "ad_per_day_per_user": 2,
+  "timeout_for_photo_seconds" : 180,
+  "too_old_for_photo_seconds": 86400
 }
 
