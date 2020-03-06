@@ -1,0 +1,43 @@
+
+var album_id= Args.album_id;
+var owner_id = Args.owner_id;
+
+var response = API.photos.getAlbums({"album_ids":album_id, "owner_id":owner_id});
+var album = response.items[0];
+
+
+var groupName = "";
+var LAST_N_PHOTOS = 20;
+
+
+if (owner_id < 0) {
+  var group = API.groups.getById({"group_id": -owner_id})[0];
+  groupName = group.name;
+}
+
+var photos = API.photos.get(
+  {"album_id":album_id,
+    "owner_id":owner_id,
+    "rev": 1,
+    "extended": 1,
+    "count": LAST_N_PHOTOS
+  }
+);
+photos = photos.items;
+
+var i = 0;
+
+var commentsArray = [];
+var usersArray = [];
+while (i < photos.length) {
+  var photo = photos[i];
+  var comments = API.photos.getComments({"photo_id": photo.id, "owner_id": owner_id});
+  commentsArray.push({"photo_id": photo.id, "comments": comments});
+  i = i + 1;
+}
+
+return {"album_name": album.title,
+        "group_name": groupName,
+        "photos": photos,
+        "comments": commentsArray
+};
