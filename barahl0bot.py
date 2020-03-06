@@ -11,23 +11,17 @@ from enum import Enum
 __author__ = 'fut33v'
 
 DATA_DIRNAME = "data/"
-TOKEN_FILENAME = DATA_DIRNAME + "token"
 ALBUMS_FILENAME = DATA_DIRNAME + 'albums'
-ADMIN_FILENAME = DATA_DIRNAME + 'admin'
-CHANNEL_FILENAME = DATA_DIRNAME + 'channel'
 
-admins = None
-with open(ADMIN_FILENAME) as admins_file:
-    lines = admins_file.readlines()
-    if lines:
-        admins = list()
-        for line in lines:
-            admins.append(line[:-1])
-        admins = set(admins)
-
-
-CHANNEL = bot_util.read_one_string_file(CHANNEL_FILENAME)
 REGEXP_ALBUM = re.compile("http[s]?://vk.com/album(-?\d*_\d*)")
+
+_SETTINGS_JSON_FILENAME = "settings.json"
+SETTINGS = bot_util.load_json_file(_SETTINGS_JSON_FILENAME)
+ADMINS = set(SETTINGS['admins'])
+CHANNELS = set(SETTINGS['channels'])
+TOKEN = SETTINGS['token']
+TOKEN_VK = SETTINGS['token_vk']
+SECONDS_TO_SLEEP = SETTINGS['seconds_to_sleep']
 
 
 def start_handler(update, context):
@@ -105,53 +99,71 @@ def remove_album_handler(update, context):
 class UserState(Enum):
     CHILLING = 0
     WAITING_FOR_PHOTO = 1
-    WAITING_FOR_TEXT = 2
+    WAITING_FOR_TEXT = 2,
+    WAITING_FOR_APPROVE = 3
 
 
 ACTIVE_USERS = {}
 
 
 def add_item_handler(update, context):
-    message = "Пришли фото или альбом."
+    message = "Пришлите фото или альбом.\n\nИли нажмите /cancel для отмены."
     context.bot.send_message(update.effective_chat.id, message)
     return UserState.WAITING_FOR_PHOTO
 
 
-def add_item_chilling(update, context):
-    return ""
-
-
-def add_item_waiting_for_photo(update, context):
-    message = "Теперь пиши описание товара."
-    context.bot.send_message(update.effective_chat.id, message)
-
+def add_item_process_photo(update, context):
     # save photo to some user related dictionary
-    ACTIVE_USERS[update.effective_user] = update.effective_message
+    ACTIVE_USERS[update.effective_user] = {"photo": update.effective_message}
+
+    message = "Теперь пришлите описание товара.\n\nИли нажмите /cancel для отмены."
+    context.bot.send_message(update.effective_chat.id, message)
 
     return UserState.WAITING_FOR_TEXT
 
 
-def add_item_waiting_for_text(update, context):
+def add_item_process_text(update, context):
     description = update.effective_message.text
-    # get photo for this user and send photo+desc to channel
+
+    if description == '/cancel':
+        return ConversationHandler.END
+
     if update.effective_user.username:
         description = "@" + update.effective_user.username + "\n" + description
-    photo_message = ACTIVE_USERS[update.effective_user]
 
-    context.bot.send_photo(chat_id=CHANNEL, photo=photo_message.photo[-1].file_id, caption=description[:1024])
-    # context.bot.send_message(CHANNEL, description)
+    # get photo for this user and send photo+desc to channel
+    ACTIVE_USERS[update.effective_user]["description"] = description
+
+    message = "Нажмите */done* для подтверждения или */cancel* для отмены."
+    context.bot.send_message(update.effective_chat.id, message, parse_mode=telegram.ParseMode.MARKDOWN)
+
+    return UserState.WAITING_FOR_APPROVE
+
+
+def add_item_process_approve(update, context):
+    description = ACTIVE_USERS[update.effective_user]["description"]
+    photo_message = ACTIVE_USERS[update.effective_user]["photo"]
+    for channel in CHANNELS:
+        context.bot.send_photo(chat_id=channel, photo=photo_message.photo[-1].file_id, caption=description[:1024])
+
+    message = "Товар размещен в барахолке."
+    context.bot.send_message(update.effective_chat.id, message)
 
     return ConversationHandler.END
 
 
 def cancel_handler(update, context):
-    return ""
+    return ConversationHandler.END
+
+
+def post_to_channel(message, channel):
+    bot = telegram.Bot(token=TOKEN)
+    return bot.send_message(channel, message, parse_mode=telegram.ParseMode.HTML)
+
 
 
 if __name__ == "__main__":
-    token = bot_util.read_one_string_file(TOKEN_FILENAME)
-    print(token)
-    updater = Updater(token, use_context=True)
+    updater = Updater(TOKEN, use_context=True)
     dispatcher = updater.dispatcher
 
     dispatcher.add_handler(CommandHandler('start', start_handler))
@@ -159,17 +171,14 @@ if __name__ == "__main__":
     dispatcher.add_handler(CommandHandler('addalbum', add_album_handler))
     dispatcher.add_handler(CommandHandler('removealbum', remove_album_handler))
 
-    additem_ch = CommandHandler('additem', add_item_handler)
-    fallbacks = [CommandHandler('cancel', cancel_handler)]
-    print(type(fallbacks))
     dispatcher.add_handler(
-        ConversationHandler(entry_points=[additem_ch],
+        ConversationHandler(entry_points=[CommandHandler('additem', add_item_handler)],
                             states={
-                                UserState.CHILLING: [Handler(add_item_chilling)],
                                 UserState.WAITING_FOR_PHOTO: [MessageHandler(
-                                    callback=add_item_waiting_for_photo, filters=Filters.photo)],
+                                    callback=add_item_process_photo, filters=Filters.photo)],
                                 UserState.WAITING_FOR_TEXT: [MessageHandler(
-                                    callback=add_item_waiting_for_text, filters=Filters.text)]
+                                    callback=add_item_process_text, filters=Filters.text)],
+                                UserState.WAITING_FOR_APPROVE: [CommandHandler('done', add_item_process_approve)]
                             },
                             fallbacks=[CommandHandler('cancel', cancel_handler)],
         )

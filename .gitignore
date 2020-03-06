@@ -2,3 +2,6 @@
 .idea
 data/
 *.pid
+settings.json
+log
+*.db

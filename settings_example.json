@@ -1,0 +1,9 @@
+{
+  "token": "" ,
+  "token_vk": "",
+  "channels": ["@barahl0"],
+  "admins": ["fut33v"],
+  "seconds_to_sleep": 120,
+  "ad_per_day_per_user": 2
+}
+

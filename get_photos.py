@@ -3,20 +3,31 @@
 import json
 import re
 import time
+import logging
+import datetime
+import os
 
 import barahl0bot
-from broadcast import broadcast_message
 from check_photo import is_photo_unique
 from util import bot_util
 
 _HASH_FILENAME = barahl0bot.DATA_DIRNAME + 'hash'
-_TOKEN_VK_FILENAME = barahl0bot.DATA_DIRNAME + 'token_vk'
-_TOKEN_VK = bot_util.read_one_string_file(_TOKEN_VK_FILENAME)
+_TOKEN_VK = barahl0bot.TOKEN_VK
+_SECONDS_TO_SLEEP = barahl0bot.SECONDS_TO_SLEEP
+
 _OWNER_ID_POST_BY_GROUP_ADMIN = 100
 _LAST_ITEMS_COUNT = 20
 _ALBUM_ID_WALL = "wall"
 _REGEX_HTTP = re.compile("http")
 _REGEX_HTTPS = re.compile("https")
+
+_TIMEOUT_FOR_PHOTO_SECONDS = 180
+_TOO_OLD_FOR_PHOTO_SECONDS = 24*60*60
+
+_CHANNELS = barahl0bot.CHANNELS
+
+def build_album_url(_owner_id, _album_id):
+    return "https://vk.com/album{}_{}".format(_owner_id, _album_id)
 
 
 def build_photos_get_url(_owner_id, _album_id, _token):
@@ -67,18 +78,24 @@ def get_photo_comments(_owner_id, _photo_id):
         return None
     response_json = json.loads(response_text)
 
-    if 'response' in response_json:
-        response = response_json['response']
-        if 'items' in response:
-            return response['items']
+    if 'response' not in response_json:
+        logging.error("no 'response' for getComments")
+        logging.error(response_json)
+        return None
 
-    return None
+    response = response_json['response']
+    if 'items' not in response:
+        logging.error("no 'items' in 'response' for getComments")
+        logging.error(response)
+        return None
+
+    return response['items']
 
 
 def make_numbers_bold(_text):
-    if not isinstance(_text, unicode):
+    if not isinstance(_text, str):
         return _text
-    _tokens = _text.split(u' ')
+    _tokens = _text.split(' ')
     _tokens_bold = []
     for t in _tokens:
         is_digit = False
@@ -92,11 +109,11 @@ def make_numbers_bold(_text):
             # is_link = True
             is_digit = False
         if is_digit:
-            _tokens_bold.append(u"<b>" + t + u"</b>")
+            _tokens_bold.append("<b>" + t + "</b>")
         else:
             _tokens_bold.append(t)
 
-    result = unicode()
+    result = str()
     for t in _tokens_bold:
         result += t + " "
 
@@ -131,15 +148,21 @@ def get_user_info(_user_id):
 def get_album_name(_owner_id, _album_id):
     u = build_photos_get_albums_url(_owner_id, _album_id, _TOKEN_VK)
     response_text = bot_util.urlopen(u)
-    if response_text:
-        response_json = json.loads(response_text)
-        if 'response' in response_json:
-            response = response_json['response']
-            if 'items' in response:
-                album_info = response['items'][0]
-                album_name = album_info['title']
-                return album_name
-    return None
+    if not response_text:
+        return None
+    response_json = json.loads(response_text)
+    if 'response' not in response_json:
+        logging.error("no 'response' for getAlbums")
+        logging.error(response_json)
+        return None
+    response = response_json['response']
+    if 'items' not in response:
+        logging.error("no 'items' in 'response' for getAlbums")
+        logging.error(response)
+        return None
+    album_info = response['items'][0]
+    album_name = album_info['title']
+    return album_name
 
 
 def get_group_name(_owner_id):
@@ -219,7 +242,7 @@ def build_message(_good):
     text = ""
     if 'text' in _photo_item:
         text = _photo_item['text']
-        if text == u'' and user_id:
+        if text == '' and user_id:
             if 'post_id' in _photo_item:
                 post_id = _photo_item['post_id']
                 text = get_post_text(user_id, post_id)
@@ -227,28 +250,28 @@ def build_message(_good):
     if 'id' in _photo_item:
         photo_id = str(_photo_item['id'])
 
-    latest_product = u""
-    latest_product += "" + photo_url + u"\n"
+    latest_product = ""
+    latest_product += "" + photo_url + "\n"
     if _album_name is not None and _group_name is not None:
-        latest_product += u"<b>" + _group_name + u"/" + _album_name + u"</b>\n\n"
+        latest_product += "<b>" + _group_name + "/" + _album_name + "</b>\n\n"
     if text != "":
         text = text.lower()
         text = text.replace('\n', ' ')
         text = make_numbers_bold(text)
-        latest_product += u"<b>Описание:</b> " + text + u"\n\n"
+        latest_product += "<b>Описание:</b> " + text + "\n\n"
     if comments != "":
         comments = comments.lower()
         comments = comments.replace('\n', ' ')
         comments = make_numbers_bold(comments)
-        latest_product += u"<b>Каменты:</b> " + comments + u"\n"
+        latest_product += "<b>Каменты:</b> " + comments + "\n"
     if user_id is not None and user_id != "":
-        latest_product += u"<b>Продавец:</b> <a href=\"https://vk.com/id" + user_id + u"\">" + \
-                          user_first_name + u" " + user_last_name + u"</a>"
+        latest_product += "<b>Продавец:</b> <a href=\"https://vk.com/id" + user_id + "\">" + \
+                          user_first_name + " " + user_last_name + "</a>"
     if user_city != "":
-        latest_product += u" (" + user_city + u")"
+        latest_product += " (" + user_city + ")"
     latest_product += "\n"
-    nice_photo_url = u"https://vk.com/photo" + owner_id + u"_" + photo_id
-    latest_product += u"<b>Фото:</b>" + nice_photo_url + u"\n"
+    nice_photo_url = "https://vk.com/photo" + owner_id + "_" + photo_id
+    latest_product += "<b>Фото:</b>" + nice_photo_url + "\n"
 
     return latest_product
 
@@ -257,40 +280,56 @@ def get_goods_from_album(_owner_id, _album_id):
     u = build_photos_get_url(_owner_id, _album_id, _TOKEN_VK)
     response_text = bot_util.urlopen(u)
     if not response_text:
-        print("failed to get data!")
+        logging.error("failed to photos.get!")
         return None
     response_json = json.loads(response_text)
     items_to_post = list()
-    if 'response' in response_json:
-        response = response_json['response']
-        if 'items' in response:
-            items = response['items']
-            last_items = items[:_LAST_ITEMS_COUNT]
 
-            album_name = get_album_name(_owner_id, _album_id)
-            group_name = get_group_name(_owner_id)
+    if 'response' not in response_json:
+        logging.error("no 'response' in dictionary for photos.get")
+        logging.error(response_json)
+        return None
 
-            for item in last_items:
-                if 'date' in item and 'id' in item:
-                    date = item['date']
-                    photo_id = item['id']
-                    now_timestamp = bot_util.get_unix_timestamp()
-                    diff = now_timestamp - date
-                    if 180 < diff < 86400:
-                        photo_url = get_url_of_jpeg(item)
-                        if is_photo_unique(_HASH_FILENAME, photo_url):
-                            comments = get_photo_comments(_owner_id, photo_id)
-                            if int(_owner_id) > 0:
-                                item['user_id'] = _owner_id
-                                user_info = get_user_info(_owner_id)
-                                group_name = unicode(user_info['first_name']) + u" " + unicode(user_info['last_name'])
-                                if _album_id == _ALBUM_ID_WALL:
-                                    album_name = u"Фото со стены"
-                            items_to_post.append({"item": item,
-                                                  'comments': comments,
-                                                  'album_name': album_name,
-                                                  'group_name': group_name})
-                            time.sleep(1)
+    response = response_json['response']
+
+    if 'items' not in response:
+        logging.error("no 'items' in response for photos.get")
+        logging.error(response_json)
+        return None
+
+    items = response['items']
+    last_items = items[:_LAST_ITEMS_COUNT]
+
+    # logging.debug('got items in album {}'.format(build_album_url(_owner_id, _album_id)))
+
+    album_name = get_album_name(_owner_id, _album_id)
+    group_name = get_group_name(_owner_id)
+
+    for item in last_items:
+        if 'date' not in item and 'id' not in item:
+            logging.error("no 'date' and 'id' in photo!")
+            continue
+        date = item['date']
+        photo_id = item['id']
+        now_timestamp = bot_util.get_unix_timestamp()
+        diff = now_timestamp - date
+        if _TIMEOUT_FOR_PHOTO_SECONDS < diff < _TOO_OLD_FOR_PHOTO_SECONDS:
+            photo_url = get_url_of_jpeg(item)
+            if is_photo_unique(_HASH_FILENAME, photo_url):
+                comments = get_photo_comments(_owner_id, photo_id)
+                if int(_owner_id) > 0:
+                    item['user_id'] = _owner_id
+                    user_info = get_user_info(_owner_id)
+                    group_name = str(user_info['first_name']) + " " + str(user_info['last_name'])
+                    if _album_id == _ALBUM_ID_WALL:
+                        album_name = "Фото со стены"
+                items_to_post.append({"item": item,
+                                      'comments': comments,
+                                      'album_name': album_name,
+                                      'group_name': group_name})
+                time.sleep(1)
+        else:
+            logging.debug("too old or too yong ({} seconds of life)".format(diff))
 
     return items_to_post
 
@@ -311,13 +350,33 @@ def update_hash(_owner_id, _album_id):
                 is_photo_unique(_HASH_FILENAME, photo_url)
 
 
+_LOGS_DIR = 'log'
+
 if __name__ == "__main__":
+
+    if not os.path.exists(_LOGS_DIR):
+        os.mkdir(_LOGS_DIR)
+
+    now = datetime.datetime.now()
+    now = now.strftime("%d_%m_%Y__%H:%M:%S")
+    log_filename = _LOGS_DIR + "/barahl0bot_{}.log".format(now)
+    logging.basicConfig(format='%(levelname)s %(asctime)s %(message)s', datefmt='%d/%m/%Y %H:%M:%S ')
+    logging.getLogger().setLevel(logging.DEBUG)
+    formatter = logging.Formatter('%(levelname)s %(asctime)s %(message)s')
+    fh = logging.FileHandler(log_filename)
+    fh.setLevel(logging.DEBUG)
+    fh.setFormatter(formatter)
+    logging.getLogger().addHandler(fh)
+    # ch = logging.StreamHandler()
+    # logging.getLogger().addHandler(ch)
+    # ch.setLevel(logging.INFO)
+
     while True:
         with open(barahl0bot.ALBUMS_FILENAME, "r") as albums_file:
             lines = albums_file.readlines()
-            for l in lines:
-                l = l[:-1]
-                oa_id = l.split('_')
+            for album_line in lines:
+                album_line = album_line[:-1]
+                oa_id = album_line.split('_')
                 if len(oa_id) < 2:
                     continue
                 owner_id = oa_id[0]
@@ -325,15 +384,19 @@ if __name__ == "__main__":
                 if album_id == "00":
                     album_id = "wall"
 
-                print("Getting photos from album:")
-                print("> https://vk.com/album" + owner_id + "_" + album_id)
+                logging.info("Getting photos from album:")
+                logging.info("> https://vk.com/album" + owner_id + "_" + album_id)
 
                 goods = get_goods_from_album(owner_id, album_id)
                 if goods:
-                    print(len(goods), "new goods")
+                    logging.info((len(goods), "new goods"))
                     for g in goods:
                         message = build_message(g)
-                        if not broadcast_message(message):
-                            print("failed to send good", g)
-        time.sleep(30)
-        print("tick")
+
+                        for channel in _CHANNELS:
+                            sent = barahl0bot.post_to_channel(message, channel)
+                            logging.info(sent)
+
+        logging.info("sleep for {} seconds".format(_SECONDS_TO_SLEEP))
+        time.sleep(_SECONDS_TO_SLEEP)
+        logging.info("tick")
