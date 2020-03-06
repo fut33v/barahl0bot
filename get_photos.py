@@ -37,61 +37,38 @@ def build_album_url(_owner_id, _album_id):
     return "https://vk.com/album{}_{}".format(_owner_id, _album_id)
 
 
-def build_photos_get_comments_url(_owner_id, _photo_id, _token):
-    return "https://api.vk.com/method/photos.getComments?owner_id={o}&photo_id={i}&v=5.69&access_token" \
-           "={t}".format(t=_token, o=_owner_id, i=_photo_id)
+# def get_url_of_jpeg(latest_photo):
+#     if latest_photo is None:
+#         return None
+#     photo_url = ""
+#     if 'photo_1280' in latest_photo:
+#         photo_url = latest_photo['photo_1280']
+#     elif 'photo_807' in latest_photo:
+#         photo_url = latest_photo['photo_807']
+#     elif 'photo_604' in latest_photo:
+#         photo_url = latest_photo['photo_604']
+#     return photo_url
 
 
-def build_photos_get_albums_url(_owner_id, _album_id, _token):
-    return "https://api.vk.com/method/photos.getAlbums?album_ids={a}&owner_id={o}&v=5.69&access_token={t}". \
-        format(a=_album_id, o=_owner_id, t=_token)
-
-
-def build_groups_get_by_id_url(_group_id, _token):
-    return "https://api.vk.com/method/groups.getById?group_id={g}&v=5.63&access_token={t}".format(g=_group_id, t=_token)
-
-
-def build_users_get_url(_user_id, _token):
-    return "https://api.vk.com/method/users.get?user_ids={u}&fields=city&v=5.63&access_token={t}".\
-        format(u=_user_id, t=_token)
-
-
-def build_wall_get_by_id_url(_posts):
-    return "https://api.vk.com/method/wall.getById?posts={p}&v=5.69".format(p=_posts)
-
-
-def get_url_of_jpeg(latest_photo):
-    if latest_photo is None:
-        return None
-    photo_url = ""
-    if 'photo_1280' in latest_photo:
-        photo_url = latest_photo['photo_1280']
-    elif 'photo_807' in latest_photo:
-        photo_url = latest_photo['photo_807']
-    elif 'photo_604' in latest_photo:
-        photo_url = latest_photo['photo_604']
-    return photo_url
-
-
-def get_photo_comments(_owner_id, _photo_id):
-    u = build_photos_get_comments_url(_owner_id, _photo_id, _TOKEN_VK)
-    response_text = bot_util.urlopen(u)
-    if not response_text:
-        return None
-    response_json = json.loads(response_text)
-
-    if 'response' not in response_json:
-        logging.error("no 'response' for getComments")
-        logging.error(response_json)
-        return None
-
-    response = response_json['response']
-    if 'items' not in response:
-        logging.error("no 'items' in 'response' for getComments")
-        logging.error(response)
-        return None
-
-    return response['items']
+# def get_photo_comments(_owner_id, _photo_id):
+#     u = build_photos_get_comments_url(_owner_id, _photo_id, _TOKEN_VK)
+#     response_text = bot_util.urlopen(u)
+#     if not response_text:
+#         return None
+#     response_json = json.loads(response_text)
+#
+#     if 'response' not in response_json:
+#         logging.error("no 'response' for getComments")
+#         logging.error(response_json)
+#         return None
+#
+#     response = response_json['response']
+#     if 'items' not in response:
+#         logging.error("no 'items' in 'response' for getComments")
+#         logging.error(response)
+#         return None
+#
+#     return response['items']
 
 
 def make_numbers_bold(_text):
@@ -122,84 +99,47 @@ def make_numbers_bold(_text):
     return result
 
 
-def get_user_info(_user_id):
-    u = build_users_get_url(_user_id, _TOKEN_VK)
-    response_text = bot_util.urlopen(u)
-    if response_text:
-        response_json = json.loads(response_text)
-        if 'response' in response_json:
-            response = response_json['response']
-            if len(response) == 0:
-                return None
-            _user_info = response[0]
-            first_name = ""
-            last_name = ""
-            city = ""
-            if "first_name" in _user_info:
-                first_name = _user_info["first_name"]
-            if "last_name" in _user_info:
-                last_name = _user_info["last_name"]
-            if "city" in _user_info:
-                if "title" in _user_info["city"]:
-                    city = _user_info["city"]["title"]
-            _user_info = {'first_name': first_name, 'last_name': last_name, 'city': city}
-            return _user_info
-    return None
+# def get_user_info(_user_id):
+#     u = build_users_get_url(_user_id, _TOKEN_VK)
+#     response_text = bot_util.urlopen(u)
+#     if response_text:
+#         response_json = json.loads(response_text)
+#         if 'response' in response_json:
+#             response = response_json['response']
+#             if len(response) == 0:
+#                 return None
+#             _user_info = response[0]
+#             first_name = ""
+#             last_name = ""
+#             city = ""
+#             if "first_name" in _user_info:
+#                 first_name = _user_info["first_name"]
+#             if "last_name" in _user_info:
+#                 last_name = _user_info["last_name"]
+#             if "city" in _user_info:
+#                 if "title" in _user_info["city"]:
+#                     city = _user_info["city"]["title"]
+#             _user_info = {'first_name': first_name, 'last_name': last_name, 'city': city}
+#             return _user_info
+#     return None
 
 
-def get_album_name(_owner_id, _album_id):
-    u = build_photos_get_albums_url(_owner_id, _album_id, _TOKEN_VK)
-    response_text = bot_util.urlopen(u)
-    if not response_text:
-        return None
-    response_json = json.loads(response_text)
-    if 'response' not in response_json:
-        logging.error("no 'response' for getAlbums")
-        logging.error(response_json)
-        return None
-    response = response_json['response']
-    if 'items' not in response:
-        logging.error("no 'items' in 'response' for getAlbums")
-        logging.error(response)
-        return None
-    album_info = response['items'][0]
-    album_name = album_info['title']
-    return album_name
-
-
-def get_group_name(_owner_id):
-    _owner_id = int(_owner_id)
-    if _owner_id > 0:
-        return None
-    u = build_groups_get_by_id_url(-_owner_id, _TOKEN_VK)
-    response_text = bot_util.urlopen(u)
-    if response_text:
-        response_json = json.loads(response_text)
-        if 'response' in response_json:
-            response = response_json['response']
-            if len(response) == 0:
-                return None
-            if 'name' in response[0]:
-                return response[0]['name']
-    return None
-
-
-def get_post_text(_owner_id, _post_id):
-    if int(_owner_id) < 0:
-        return None
-    _post_id = str(_post_id)
-    full_post_id = _owner_id + "_" + _post_id
-    u = build_wall_get_by_id_url(full_post_id)
-    response_text = bot_util.urlopen(u)
-    if response_text:
-        response_json = json.loads(response_text)
-        if 'response' in response_json:
-            response = response_json['response']
-            if len(response) == 0:
-                return None
-            if 'text' in response[0]:
-                return response[0]['text']
-    return None
+# def get_post_text(_owner_id, _post_id):
+#     if int(_owner_id) < 0:
+#         return None
+#     _post_id = str(_post_id)
+#     full_post_id = _owner_id + "_" + _post_id
+#     u = build_wall_get_by_id_url(full_post_id)
+#     response_text = bot_util.urlopen(u)
+#     if response_text:
+#         response_json = json.loads(response_text)
+#         if 'response' in response_json:
+#             response = response_json['response']
+#             if len(response) == 0:
+#                 return None
+#             if 'text' in response[0]:
+#                 return response[0]['text']
+#     return None
 
 
 def build_message(_good):
@@ -279,22 +219,17 @@ def build_message(_good):
 
 
 def get_goods_from_album(_owner_id, _album_id):
-    response = _VK_API.photos.get(album_id=_album_id, owner_id=_owner_id, extended=1, rev=1, v=5.69)
+
+    response = _VK_API.execute.getPhotosX(album_id=_album_id, owner_id=_owner_id)
 
     items_to_post = list()
 
-    if 'items' not in response:
-        logging.error("no 'items' in response for photos.get")
-        logging.error(response)
-        return None
+    album_name = response['album_name']
+    group_name = response['group_name']
+    photos = response['photos']
+    comments = response['comments']
 
-    items = response['items']
-    last_items = items[:_LAST_ITEMS_COUNT]
-
-    album_name = get_album_name(_owner_id, _album_id)
-    group_name = get_group_name(_owner_id)
-
-    for item in last_items:
+    for item in photos:
         if 'date' not in item and 'id' not in item:
             logging.error("no 'date' and 'id' in photo!")
             continue
@@ -303,37 +238,43 @@ def get_goods_from_album(_owner_id, _album_id):
         now_timestamp = bot_util.get_unix_timestamp()
         diff = now_timestamp - date
         if _TIMEOUT_FOR_PHOTO_SECONDS < diff < _TOO_OLD_FOR_PHOTO_SECONDS:
-            photo_url = get_url_of_jpeg(item)
+            photo_url = item['sizes'][-1]
             if is_photo_unique(_HASH_FILENAME, photo_url):
-                comments = get_photo_comments(_owner_id, photo_id)
-                if int(_owner_id) > 0:
-                    item['user_id'] = _owner_id
-                    user_info = get_user_info(_owner_id)
-                    group_name = str(user_info['first_name']) + " " + str(user_info['last_name'])
-                    if _album_id == _ALBUM_ID_WALL:
-                        album_name = "Фото со стены"
-                items_to_post.append({"item": item,
-                                      'comments': comments,
-                                      'album_name': album_name,
-                                      'group_name': group_name})
-                time.sleep(1)
+                items_to_post.append({
+                    'album_name': album_name,
+                    'group_name': group_name,
+                    'item': item,
+                })
+
+                # comments = get_photo_comments(_owner_id, photo_id)
+                # if int(_owner_id) > 0:
+                #     item['user_id'] = _owner_id
+                #     user_info = get_user_info(_owner_id)
+                #     group_name = str(user_info['first_name']) + " " + str(user_info['last_name'])
+                #     if _album_id == _ALBUM_ID_WALL:
+                #         album_name = "Фото со стены"
+
+                # items_to_post.append({"item": item,
+                #                       'comments': comments,
+                #                       'album_name': album_name,
+                #                       'group_name': group_name})
         else:
-            logging.debug("too old or too yong ({} seconds of life)".format(diff))
+            logging.debug("https://vk.com/photo{}_{} too old or too yong ({} seconds of life)".format(_owner_id, photo_id, diff))
 
     return items_to_post
 
 
-def update_hash(_owner_id, _album_id):
-    response = _VK_API.photos.get(album_id=_album_id, owner_id=_owner_id, extended=1, rev=1, v=5.69)
-    if 'items' not in response:
-        logging.error("no 'items' in response for photos.get")
-        logging.error(response)
-        return None
-    items = response['items']
-    last_10_items = items[:10]
-    for item in last_10_items:
-        photo_url = get_url_of_jpeg(item)
-        is_photo_unique(_HASH_FILENAME, photo_url)
+# def update_hash(_owner_id, _album_id):
+#     response = _VK_API.photos.get(album_id=_album_id, owner_id=_owner_id, extended=1, rev=1, v=5.69)
+#     if 'items' not in response:
+#         logging.error("no 'items' in response for photos.get")
+#         logging.error(response)
+#         return None
+#     items = response['items']
+#     last_10_items = items[:10]
+#     for item in last_10_items:
+#         photo_url = get_url_of_jpeg(item)
+#         is_photo_unique(_HASH_FILENAME, photo_url)
 
 
 _LOGS_DIR = 'log'
@@ -349,15 +290,11 @@ if __name__ == "__main__":
     logging.basicConfig(format='%(levelname)s %(asctime)s %(message)s', datefmt='%d/%m/%Y %H:%M:%S ')
     logging.getLogger().setLevel(logging.DEBUG)
     formatter = logging.Formatter('%(levelname)s %(asctime)s %(message)s')
-    fh = logging.FileHandler(log_filename)
-    fh.setLevel(logging.DEBUG)
-    fh.setFormatter(formatter)
-    logging.getLogger().addHandler(fh)
-    # ch = logging.StreamHandler()
-    # logging.getLogger().addHandler(ch)
-    # ch.setLevel(logging.INFO)
 
-
+    # fh = logging.FileHandler(log_filename)
+    # fh.setLevel(logging.DEBUG)
+    # fh.setFormatter(formatter)
+    # logging.getLogger().addHandler(fh)
 
     while True:
         with open(barahl0bot.ALBUMS_FILENAME, "r") as albums_file:
