@@ -166,6 +166,9 @@ def build_message(_good):
                     if int(c['from_id']) == user_id and c['text'] != "":
                         comments_str += c['text'] + '\n'
 
+    if comments_str:
+        comments_str = comments_str[:777]
+
     text = ""
     if 'text' in photo:
         text = photo['text']
@@ -178,8 +181,9 @@ def build_message(_good):
         text = text.lower()
         text = text.replace('\n', ' ')
         text = make_numbers_bold(text)
+        text = text[:777]
         latest_product += "<b>Описание:</b> " + text + "\n\n"
-    if comments_str != "":
+    if comments_str and len(comments_str) + len(text) < 777:
         comments_str = comments_str.lower()
         comments_str = comments_str.replace('\n', ' ')
         comments_str = make_numbers_bold(comments_str)
@@ -257,10 +261,10 @@ if __name__ == "__main__":
     logging.getLogger().setLevel(logging.DEBUG)
     formatter = logging.Formatter('%(levelname)s %(asctime)s %(message)s')
 
-    fh = logging.FileHandler(log_filename)
-    fh.setLevel(logging.DEBUG)
-    fh.setFormatter(formatter)
-    logging.getLogger().addHandler(fh)
+    # fh = logging.FileHandler(log_filename)
+    # fh.setLevel(logging.DEBUG)
+    # fh.setFormatter(formatter)
+    # logging.getLogger().addHandler(fh)
 
     while True:
         with open(barahl0bot.ALBUMS_FILENAME, "r") as albums_file:
