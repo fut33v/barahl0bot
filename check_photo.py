@@ -13,8 +13,11 @@ def is_photo_unique(file_name, url):
     if not bot_util.check_file_for_string(file_name, h + "\n"):
         return False
     else:
-        bot_util.append_string_to_file(file_name, h + "\n")
-        return True
+        return h
+
+
+def add_photo_hash(file_name, _photo_hash):
+    bot_util.append_string_to_file(file_name, _photo_hash + "\n")
 
 
 if __name__ == "__main__":

@@ -17,7 +17,10 @@ def urlopen(url, data=None):
             urllib.request.urlopen(url, data)
             return True
         else:
-            return urllib.request.urlopen(url, data).read()
+            response = urllib.request.urlopen(url)
+            data = response.read()
+            return data
+            #urllib.request.urlopen(url).read()
     except urllib.error.HTTPError as e:
         print(("HTTPError", e, url, data))
     except urllib.error.URLError as e:

@@ -156,7 +156,7 @@ def cancel_handler(update, context):
     return ConversationHandler.END
 
 
-def post_to_channel(message, channel):
+def post_to_channel_html(message, channel):
     bot = telegram.Bot(token=TOKEN)
     return bot.send_message(channel, message, parse_mode=telegram.ParseMode.HTML)
 
