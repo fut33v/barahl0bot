@@ -187,7 +187,7 @@ def build_message(_good):
     if user_id is not None and user_id != "":
         latest_product += "<b>Продавец:</b> <a href=\"https://vk.com/id" + str(user_id) + "\">" + \
                           first_name + " " + last_name + "</a>"
-    if city != "":
+    if city:
         latest_product += " (" + city + ")"
     latest_product += "\n"
     nice_photo_url = "https://vk.com/photo" + owner_id + "_" + photo_id
