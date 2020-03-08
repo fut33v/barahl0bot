@@ -16,6 +16,7 @@ from util import bot_util
 _HASH_FILENAME = barahl0bot.DATA_DIRNAME + 'hash'
 _TOKEN_VK = barahl0bot.TOKEN_VK
 _SECONDS_TO_SLEEP = barahl0bot.SECONDS_TO_SLEEP
+_SECONDS_TO_SLEEP_BETWEEN_ALBUMS = 1
 
 _OWNER_ID_POST_BY_GROUP_ADMIN = 100
 _LAST_ITEMS_COUNT = 20
@@ -204,7 +205,7 @@ def get_goods_from_album(_owner_id, _album_id):
 
     response = _VK_API.execute.getPhotosX(album_id=_album_id, owner_id=_owner_id)
 
-    items_to_post = list()
+    new_goods_list = list()
 
     album_name = response['album_name']
     group_name = response['group_name']
@@ -233,7 +234,7 @@ def get_goods_from_album(_owner_id, _album_id):
                 # get user info here
                 user_info = _VK_API.users.get(user_ids=item['user_id'], fields='city')[0]
 
-                items_to_post.append({
+                new_goods_list.append({
                     'album_name': album_name,
                     'group_name': group_name,
                     'photo': item,
@@ -244,7 +245,7 @@ def get_goods_from_album(_owner_id, _album_id):
         else:
             logging.debug("https://vk.com/photo{}_{} too old or too yong ({} seconds of life)".format(_owner_id, photo_id, diff))
 
-    return items_to_post
+    return new_goods_list
 
 
 _LOGS_DIR = 'log'
@@ -286,17 +287,29 @@ if __name__ == "__main__":
                 if goods:
                     logging.info((len(goods), "new goods"))
                     for g in goods:
-                        message = build_message(g)
+                        photo_id = g['photo']['id']
+                        logging.info("https://vk.com/photo{}_{}".format(owner_id, photo_id))
 
+                    for g in goods:
+                        message = build_message(g)
+                        if not message:
+                            continue
+                        # if len(goods) > 3 then sleep between sends
                         for channel in _CHANNELS:
                             sent = barahl0bot.post_to_channel_html(message, channel)
-                            logging.info(sent)
-                            if (sent):
+
+                            # if too many new goods lets sleep between message send for
+                            # telegram to be chill
+                            if len(goods) > 3:
+                                time.sleep(1)
+
+                            # if we sent message than write hash of photo for future
+                            logging.debug(sent)
+                            if sent:
                                 check_photo.add_photo_hash(_HASH_FILENAME, g['hash'])
 
-                sleep_for_x_seconds = 1
-                logging.info("Sleep for {} seconds before next album".format(sleep_for_x_seconds))
-                time.sleep(sleep_for_x_seconds)
+                logging.info("Sleep for {} seconds before next album".format(_SECONDS_TO_SLEEP_BETWEEN_ALBUMS))
+                time.sleep(_SECONDS_TO_SLEEP_BETWEEN_ALBUMS)
 
         logging.info("sleep for {} seconds".format(_SECONDS_TO_SLEEP))
         time.sleep(_SECONDS_TO_SLEEP)
