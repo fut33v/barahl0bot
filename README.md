@@ -15,8 +15,10 @@ Works here: https://t.me/barahlochannel
 + python3
 + python-telegram-bot
 + vk_api
++ pytz
 
 ````
-$ pip install python-telegram-bot
-$ pip install vk_api
+$ pip3 install python-telegram-bot
+$ pip3 install vk_api
+$ pip3 install pytz
 ````

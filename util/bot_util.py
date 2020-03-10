@@ -10,6 +10,7 @@ import urllib.request
 
 from datetime import datetime
 from datetime import timezone
+import pytz
 
 from functools import partial
 
@@ -42,7 +43,8 @@ def get_unix_timestamp():
 
 
 def get_photo_time_from_unix_timestamp(_timestamp):
-    dt = datetime.fromtimestamp(_timestamp)
+    moscow = pytz.timezone('Europe/Moscow')
+    dt = datetime.fromtimestamp(_timestamp, moscow)
     return "{:02d}.{:02d}.{} {:02d}:{:02d}".format(dt.day, dt.month, dt.year, dt.hour, dt.minute)
 
 
