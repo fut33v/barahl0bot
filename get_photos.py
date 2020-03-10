@@ -304,7 +304,7 @@ if __name__ == "__main__":
                             # if too many new goods lets sleep between message send for
                             # telegram to be chill
                             if len(goods) > 3:
-                                time.sleep(1)
+                                time.sleep(5)
 
                 _LOGGER.info("Sleep for {} seconds before next album".format(_SECONDS_TO_SLEEP_BETWEEN_ALBUMS))
                 time.sleep(_SECONDS_TO_SLEEP_BETWEEN_ALBUMS)
