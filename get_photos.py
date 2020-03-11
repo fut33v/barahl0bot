@@ -280,16 +280,17 @@ def get_goods_from_album(_owner_id, _album_id):
             _LOGGER.error("no 'date' and 'id' in photo!")
             continue
 
-        photo_id = item['id']
-        if check_photo.is_photo_in_last(_LAST_FILENAME, _owner_id, photo_id):
-            _LOGGER.debug("{} in last filename".format(build_photo_url(_owner_id, photo_id)))
-            continue
-
         date = item['date']
         now_timestamp = bot_util.get_unix_timestamp()
         diff = now_timestamp - date
 
         if _TIMEOUT_FOR_PHOTO_SECONDS < diff < _TOO_OLD_FOR_PHOTO_SECONDS:
+
+            photo_id = item['id']
+            if check_photo.is_photo_in_last(_LAST_FILENAME, _owner_id, photo_id):
+                _LOGGER.debug("{} in last filename".format(build_photo_url(_owner_id, photo_id)))
+                continue
+
             photo_url = item['sizes'][-1]['url']
             photo_hash = check_photo.check_photo_hash(_HASH_FILENAME, photo_url)
             if not photo_hash:
