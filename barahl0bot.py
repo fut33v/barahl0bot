@@ -1,4 +1,3 @@
-# coding=utf-8
 import re
 
 from util import bot_util
@@ -22,6 +21,7 @@ CHANNELS = set(SETTINGS['channels'])
 ERROR_CHANNEL = SETTINGS['error_channel']
 TOKEN = SETTINGS['token']
 TOKEN_VK = SETTINGS['token_vk']
+TOKEN_VK_WALL = SETTINGS['token_vk_wall']
 SECONDS_TO_SLEEP = SETTINGS['seconds_to_sleep']
 
 
