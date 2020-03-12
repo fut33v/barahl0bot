@@ -5,6 +5,7 @@ import logging
 import datetime
 import os
 import traceback
+import html
 
 import vk_api
 
@@ -155,12 +156,14 @@ def build_message_telegram(_good):
     if text:
         text = text.lower()
         text = text.replace('\n', ' ')
-        text = make_numbers_bold(text)
         text = text[:777]
+        text = html.escape(text)
+        text = make_numbers_bold(text)
         latest_product += "<b>Описание:</b> " + text + "\n\n"
     if comments_str and len(comments_str) + len(text) < 777:
         comments_str = comments_str.lower()
         comments_str = comments_str.replace('\n', ' ')
+        comments_str = html.escape(comments_str)
         comments_str = make_numbers_bold(comments_str)
         latest_product += "<b>Каменты:</b> " + comments_str + "\n\n"
 
