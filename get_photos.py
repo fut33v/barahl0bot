@@ -76,6 +76,18 @@ def make_numbers_bold(_text):
     return result
 
 
+def get_widest_photo_url(_sizes):
+    photo_url = _sizes[-1]['url']
+    photo_url = None
+    max_width = 0
+    for photo_size in _sizes:
+        width = photo_size['width']
+        if width > max_width:
+            photo_url = photo_size['url']
+            max_width = width
+    return photo_url
+
+
 def build_message_telegram(_good):
     if _good is None:
         return None
@@ -92,7 +104,9 @@ def build_message_telegram(_good):
         return None
 
     photo_id = str(photo['id'])
-    photo_url = photo['sizes'][-1]['url']
+
+    photo_url = get_widest_photo_url(photo['sizes'])
+
     photo_date = photo['date']
     photo_time_str = bot_util.get_photo_time_from_unix_timestamp(photo_date)
 
@@ -185,9 +199,6 @@ def build_message_vk(_good):
         return None
 
     photo_id = str(photo['id'])
-    photo_url = photo['sizes'][-1]['url']
-    photo_date = photo['date']
-    # photo_time_str = bot_util.get_photo_time_from_unix_timestamp(photo_date)
 
     owner_id = _good['owner_id']
     seller_id = _good['seller_id']
@@ -283,15 +294,14 @@ def get_goods_from_album(_owner_id, _album_id):
         date = item['date']
         now_timestamp = bot_util.get_unix_timestamp()
         diff = now_timestamp - date
+        photo_id = item['id']
 
         if _TIMEOUT_FOR_PHOTO_SECONDS < diff < _TOO_OLD_FOR_PHOTO_SECONDS:
-
-            photo_id = item['id']
             if check_photo.is_photo_in_last(_LAST_FILENAME, _owner_id, photo_id):
                 _LOGGER.debug("{} in last filename".format(build_photo_url(_owner_id, photo_id)))
                 continue
 
-            photo_url = item['sizes'][-1]['url']
+            photo_url = get_widest_photo_url(item['sizes'])
             photo_hash = check_photo.check_photo_hash(_HASH_FILENAME, photo_url)
             if not photo_hash:
                 _LOGGER.debug("{} hash in hash file".format(build_photo_url(_owner_id, photo_id)))
@@ -409,7 +419,6 @@ def process_album(_owner_id, _album_id):
             _LOGGER.info(build_photo_url(_owner_id, photo_id))
 
         for g in goods:
-            post_vk(g)
             post_telegram(g)
 
             # if too many new goods lets sleep between message send for

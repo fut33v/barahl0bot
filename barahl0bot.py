@@ -14,14 +14,22 @@ ALBUMS_FILENAME = DATA_DIRNAME + 'albums'
 
 REGEXP_ALBUM = re.compile("http[s]?://vk.com/album(-?\d*_\d*)")
 
+
+def init_setting(_name_string):
+    if _name_string in SETTINGS:
+        return SETTINGS[_name_string]
+    return None
+
+
 _SETTINGS_JSON_FILENAME = "settings.json"
 SETTINGS = bot_util.load_json_file(_SETTINGS_JSON_FILENAME)
 ADMINS = set(SETTINGS['admins'])
 CHANNELS = set(SETTINGS['channels'])
-ERROR_CHANNEL = SETTINGS['error_channel']
 TOKEN = SETTINGS['token']
 TOKEN_VK = SETTINGS['token_vk']
-TOKEN_VK_WALL = SETTINGS['token_vk_wall']
+ERROR_CHANNEL = init_setting('error_channel')
+TOKEN_VK_WALL = init_setting('token_vk_wall')
+
 SECONDS_TO_SLEEP = SETTINGS['seconds_to_sleep']
 
 
