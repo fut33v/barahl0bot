@@ -32,8 +32,8 @@ def parse_json_file(_filename):
 
 
 if __name__ == "__main__":
-    dir_name = "../chat_export/"
-    json_files = glob.glob(dir_name + "*.json")
+    dir_name = "chat_export/"
+    json_files = glob.glob(dir_name + "messages*.json")
     print(json_files)
 
     sellers_id_set = set()
@@ -58,6 +58,6 @@ if __name__ == "__main__":
         x = sellers_id_list[i*1000:i*1000+1000]
         print(x)
         sellers = vk_api.users.get(user_ids=x, fields='city,photo_200')
-        seller_info_list.append(sellers)
+        seller_info_list.extend(sellers)
 
     bot_util.save_json_file(dir_name + "sellers.json", seller_info_list)
