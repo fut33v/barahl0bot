@@ -2,6 +2,8 @@ from bs4 import BeautifulSoup, NavigableString, Tag
 import re
 import os
 import glob
+import sys
+
 
 from util import bot_util
 
@@ -15,6 +17,7 @@ def process_html(_filename):
     photo_regexp = re.compile("Фото")
     descr_regexp = re.compile("Описание")
     comments_regexp = re.compile("Каменты")
+    id_regexp = re.compile("id")
 
     goods_list = []
     messages = soup.find_all("div", class_="message default clearfix")
@@ -78,19 +81,20 @@ def process_html(_filename):
                         photo = x.get('href')
                         photo_next = False
 
-            if not seller:
+            if not seller or not id_regexp.search(seller):
                 print(_filename, without_br, "\n\n")
-            else:
-                description = description.replace("Описание: ", '')
-                description = description.replace("Каменты: ", '')
-                good = {
-                    "photo_link": photo_link,
-                    "description": description,
-                    "seller": seller,
-                    "photo": photo
-                }
-                # print(good)
-                goods_list.append(good)
+                continue
+
+            description = description.replace("Описание: ", '')
+            description = description.replace("Каменты: ", '')
+            good = {
+                "photo_link": photo_link,
+                "description": description,
+                "seller": seller,
+                "photo": photo
+            }
+            # print(good)
+            goods_list.append(good)
 
     # json write
     json_filename = _filename.split(".")[0] + ".json"
@@ -98,19 +102,17 @@ def process_html(_filename):
 
 
 if __name__ == "__main__":
-    dir_name = "chat_export/"
+    if len(sys.argv) < 2:
+        print("give me directory of exported chat with message*.html")
+        exit(-1)
+
+    dir_name = sys.argv[1]
+
     html_files = glob.glob(dir_name + "*.html")
-    # print(html_files)
-
-    to_parse_files = []
-    for i in range(8, 34):
-        f = dir_name + "messages" + str(i) + ".html"
-        if os.path.exists(f):
-            to_parse_files.append(f)
-
-    # to_parse_files = ["chat_export/messages8.html"]
+    to_parse_files = html_files
 
     print(to_parse_files)
+
     for f in to_parse_files:
         process_html(f)
 
