@@ -6,6 +6,14 @@ import glob
 connection = pymysql.connect(host='localhost', user='fut33v', password='', db='barahlochannel', charset='utf8mb4')
 
 
+def tg_date_to_mysql(_date):
+    ds = _date.split(' ')
+    dmy = ds[0].split('.')
+    hms = ds[1]
+    # YYYY-MM-DD hh:mm:ss
+    return "{}-{}-{} {}".format(dmy[2], dmy[1], dmy[0], hms)
+
+
 def sellers_to_mysql(sellers):
     cur = connection.cursor()
     cur.execute("SET NAMES utf8mb4")
@@ -49,15 +57,19 @@ if __name__ == "__main__":
             if len(g['seller']) <= 17:
                 continue
             seller_id = int(g['seller'][17:])
+
             description = g['description']
+            description = description.replace('"', "'")
+
             vk_photo_id = g['photo'][20:]
             photo_link_jpg = g['photo_link']
 
-            # p = photo_vk_id.split("_")
-            # photo_owner_id = p[0]
-            # photo_photo_id = p[1]
-            description = description.replace('"', "'")
-            sql = 'INSERT INTO goods VALUES("{}", "{}", {}, "{}");'.format(vk_photo_id, photo_link_jpg, seller_id, description)
+            tg_post_id = g['message_id']
+            date = tg_date_to_mysql(g['date'])
+
+            sql = 'INSERT INTO goods VALUES("{}", "{}", {}, "{}", {}, "{}");'.\
+                format(vk_photo_id, photo_link_jpg, seller_id, description, tg_post_id, date)
+
             print(sql)
 
             print(len(description))
