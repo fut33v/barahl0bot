@@ -6,14 +6,6 @@ import glob
 connection = pymysql.connect(host='localhost', user='fut33v', password='', db='barahlochannel', charset='utf8mb4')
 
 
-def tg_date_to_mysql(_date):
-    ds = _date.split(' ')
-    dmy = ds[0].split('.')
-    hms = ds[1]
-    # YYYY-MM-DD hh:mm:ss
-    return "{}-{}-{} {}".format(dmy[2], dmy[1], dmy[0], hms)
-
-
 def sellers_to_mysql(sellers):
     cur = connection.cursor()
     cur.execute("SET NAMES utf8mb4")
@@ -65,7 +57,7 @@ if __name__ == "__main__":
             photo_link_jpg = g['photo_link']
 
             tg_post_id = g['message_id']
-            date = tg_date_to_mysql(g['date'])
+            date = bot_util.tg_date_to_mysql(g['date'])
 
             sql = 'INSERT INTO goods VALUES("{}", "{}", {}, "{}", {}, "{}");'.\
                 format(vk_photo_id, photo_link_jpg, seller_id, description, tg_post_id, date)

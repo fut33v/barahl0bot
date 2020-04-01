@@ -1,4 +1,3 @@
-import json
 import re
 import time
 import logging
@@ -6,12 +5,17 @@ import datetime
 import os
 import traceback
 import html
+import hashlib
 
+import pymysql
 import vk_api
 
 import barahl0bot
-import check_photo
 from util import bot_util
+
+
+_CONNECTION = pymysql.connect(host='localhost', user='fut33v', password='', db='barahlochannel', charset='utf8mb4')
+
 
 _HASH_FILENAME = barahl0bot.DATA_DIRNAME + 'hash'
 _LAST_FILENAME = barahl0bot.DATA_DIRNAME + 'last'
@@ -24,6 +28,10 @@ _SECONDS_TO_SLEEP_BETWEEN_ALBUMS = 1
 _TIMEOUT_FOR_PHOTO_SECONDS = 180
 _TOO_OLD_FOR_PHOTO_SECONDS = 24*60*60
 _LAST_FILENAME_RESTRICTION = 500
+
+_COMMENTS_STRING_RESTRICTION = 600
+_DESCRIPTION_STRING_RESTRICTION = 600
+_DESCRIPTION_PLUS_COMMENTS_STRING_RESTRICTION = 700
 
 _OWNER_ID_POST_BY_GROUP_ADMIN = 100
 _LAST_ITEMS_COUNT = 20
@@ -39,6 +47,106 @@ _VK_SESSION_WALL = vk_api.VkApi(token=_TOKEN_VK_WALL)
 _VK_API_WALL = _VK_SESSION_WALL.get_api()
 
 _LOGGER = logging.getLogger("barahl0bot")
+
+
+def get_photo_hash(url):
+    photo = bot_util.urlopen(url)
+    if not photo:
+        return None
+    sha = hashlib.sha256()
+    sha.update(photo)
+    h = sha.hexdigest()
+    return h
+
+
+def is_photo_posted_by_id(_owner_id, _photo_id):
+    photo_id_str = str(_owner_id) + "_" + str(_photo_id)
+
+    with _CONNECTION.cursor() as cursor:
+        # Read a single record
+        sql = "SELECT * FROM `goods` WHERE `vk_photo_id`=%s"
+        cursor.execute(sql, (photo_id_str,))
+        result = cursor.fetchone()
+        print(result)
+        if result:
+            return True
+
+    return False
+
+
+def is_photo_posted_by_hash(_hash):
+    with _CONNECTION.cursor() as cursor:
+        # Read a single record
+        sql = "SELECT `tg_post_id`,`date` FROM `goods` WHERE `hash`=%s ORDER BY date DESC"
+        cursor.execute(sql, (_hash,))
+        result = cursor.fetchone()
+        if result:
+            return {
+                'date': result[1],
+                'tg_post_id': result[0]
+            }
+    return False
+
+
+def save_good_to_db(_good):
+    photo = _good['photo']
+    owner_id = str(_good['owner_id'])
+    photo_id = str(photo['id'])
+    vk_photo_id = owner_id + "_" + photo_id
+    seller_id = int(_good['seller_id'])
+    tg_post_id = int(_good['tg_post_id'])
+    photo_link = get_widest_photo_url(photo['sizes'])
+    photo_hash = _good['hash']
+
+    # photo_date = photo['date']
+    # photo_time_str = bot_util.get_photo_time_from_unix_timestamp(photo_date)
+    descr = ""
+    descr += get_good_description_text(_good)
+    descr += get_good_comments_text(_good)
+
+    with _CONNECTION.cursor() as cursor:
+        sql = 'INSERT INTO `goods` VALUES(%s, %s, %s, %s, %s, NOW(), %s);'
+        cursor.execute(sql, (vk_photo_id, photo_link, seller_id, descr, tg_post_id, photo_hash))
+
+    _CONNECTION.commit()
+
+
+def get_good_description_text(_good, _restrict=True):
+    photo = _good['photo']
+    text = ""
+    if 'text' in photo:
+        text = photo['text']
+    if text:
+        text = text.lower()
+        text = text.replace('\n', ' ')
+        if _restrict:
+            text = text[:_DESCRIPTION_STRING_RESTRICTION]
+        text = html.escape(text)
+        text = make_numbers_bold(text)
+
+    return text
+
+
+def get_good_comments_text(_good, _restrict=True):
+    seller_id = _good['seller_id']
+    comments = _good['comments']
+
+    comments_str = ""
+    if comments and seller_id:
+        if len(comments) > 0:
+            for c in comments:
+                if 'from_id' and 'text' in c:
+                    if int(c['from_id']) == seller_id and c['text'] != "":
+                        comments_str += c['text'] + '\n'
+    if comments_str:
+        if _restrict:
+            comments_str = comments_str[:_COMMENTS_STRING_RESTRICTION]
+        comments_str = comments_str.lower()
+        comments_str = comments_str.replace('\n', ' ')
+        comments_str = html.escape(comments_str)
+        comments_str = make_numbers_bold(comments_str)
+
+    return comments_str
 
 
 def build_album_url(_owner_id, _album_id):
@@ -108,15 +216,11 @@ def build_message_telegram(_good):
 
     photo_url = get_widest_photo_url(photo['sizes'])
 
-    photo_date = photo['date']
-    photo_time_str = bot_util.get_photo_time_from_unix_timestamp(photo_date)
-
     owner_id = _good['owner_id']
     seller_id = _good['seller_id']
     seller_info = _good['seller_info']
     group_name = _good['group_name']
     album_name = _good['album_name']
-    comments = _good['comments']
 
     first_name = ""
     last_name = ""
@@ -131,21 +235,6 @@ def build_message_telegram(_good):
             if "title" in seller_info["city"]:
                 city = seller_info["city"]["title"]
 
-    comments_str = ""
-    if comments and seller_id:
-        if len(comments) > 0:
-            for c in comments:
-                if 'from_id' and 'text' in c:
-                    if int(c['from_id']) == seller_id and c['text'] != "":
-                        comments_str += c['text'] + '\n'
-
-    if comments_str:
-        comments_str = comments_str[:777]
-
-    text = ""
-    if 'text' in photo:
-        text = photo['text']
-
     latest_product = "" + photo_url + "\n"
 
     if owner_id > 0:
@@ -153,18 +242,12 @@ def build_message_telegram(_good):
     elif album_name and group_name:
         latest_product += "<b>{}/{}</b>\n\n".format(group_name, album_name)
 
+    text = get_good_description_text(_good)
     if text:
-        text = text.lower()
-        text = text.replace('\n', ' ')
-        text = text[:777]
-        text = html.escape(text)
-        text = make_numbers_bold(text)
         latest_product += "<b>Описание:</b> " + text + "\n\n"
-    if comments_str and len(comments_str) + len(text) < 777:
-        comments_str = comments_str.lower()
-        comments_str = comments_str.replace('\n', ' ')
-        comments_str = html.escape(comments_str)
-        comments_str = make_numbers_bold(comments_str)
+
+    comments_str = get_good_comments_text(_good)
+    if comments_str and len(comments_str) + len(text) < _DESCRIPTION_PLUS_COMMENTS_STRING_RESTRICTION:
         latest_product += "<b>Каменты:</b> " + comments_str + "\n\n"
 
     if seller_id:
@@ -181,95 +264,9 @@ def build_message_telegram(_good):
 
     nice_photo_url = build_photo_url(owner_id, photo_id)
     latest_product += "<b>Фото:</b> {}\n".format(nice_photo_url)
-    latest_product += "<b>Дата размещения:</b> {}\n".format(photo_time_str)
 
-    return latest_product
-
-
-def build_message_vk(_good):
-    if _good is None:
-        return None
-
-    if 'photo' not in _good:
-        return None
-
-    photo = _good['photo']
-    if photo is None:
-        return None
-
-    if 'id' not in photo and 'sizes' not in photo and 'user_id' not in photo and 'date' not in photo:
-        _LOGGER.error("Not found one of keys in photo dict")
-        return None
-
-    photo_id = str(photo['id'])
-
-    owner_id = _good['owner_id']
-    seller_id = _good['seller_id']
-    seller_info = _good['seller_info']
-    group_name = _good['group_name']
-    album_name = _good['album_name']
-    comments = _good['comments']
-
-    first_name = ""
-    last_name = ""
-    city = ""
-
-    if seller_info:
-        if "first_name" in seller_info:
-            first_name = seller_info["first_name"]
-        if "last_name" in seller_info:
-            last_name = seller_info["last_name"]
-        if "city" in seller_info:
-            if "title" in seller_info["city"]:
-                city = seller_info["city"]["title"]
-
-    comments_str = ""
-    if comments and seller_id:
-        if len(comments) > 0:
-            for c in comments:
-                if 'from_id' and 'text' in c:
-                    if int(c['from_id']) == seller_id and c['text'] != "":
-                        comments_str += c['text'] + '\n'
-
-    if comments_str:
-        comments_str = comments_str[:777]
-
-    text = ""
-    if 'text' in photo:
-        text = photo['text']
-
-    latest_product = ""
-
-    if owner_id > 0:
-        latest_product += "*id{} ({} {}/{})\n\n".format(owner_id, first_name, last_name, album_name)
-    elif album_name and group_name:
-        latest_product += "*club{} ({}/{})\n\n".format(-owner_id, group_name, album_name)
-
-    if text:
-        text = text.lower()
-        text = text.replace('\n', ' ')
-        text = text[:777]
-        latest_product += "Описание: " + text + "\n\n"
-    if comments_str and len(comments_str) + len(text) < 777:
-        comments_str = comments_str.lower()
-        comments_str = comments_str.replace('\n', ' ')
-        latest_product += "Комментарии: " + comments_str + "\n\n"
-
-    if seller_id:
-        if seller_id == _OWNER_ID_POST_BY_GROUP_ADMIN:
-            latest_product += \
-                "Продавец: *club{} ({})".format(-owner_id, group_name)
-        else:
-            latest_product += \
-                "Продавец: *id{} ({} {})".format(seller_id, first_name, last_name)
-    if city:
-        latest_product += " ({})".format(city)
-
-    latest_product += "\n"
-
-    nice_photo_url = build_photo_url(owner_id, photo_id)
-    latest_product += "Фото: {}\n".format(nice_photo_url)
-    # latest_product += "<b>Дата размещения:</b> {}\n".format(photo_time_str)
+    if _good['duplicate'] and _good['prev_tg_post']:
+        latest_product += "<b>Предыдущее объявление:</b> https://t.me/barahlochannel/{}".format(_good['prev_tg_post'])
 
     return latest_product
 
@@ -300,15 +297,23 @@ def get_goods_from_album(_owner_id, _album_id):
         photo_id = item['id']
 
         if _TIMEOUT_FOR_PHOTO_SECONDS < diff < _TOO_OLD_FOR_PHOTO_SECONDS:
-            if check_photo.is_photo_in_last(_LAST_FILENAME, _owner_id, photo_id):
-                _LOGGER.debug("{} in last filename".format(build_photo_url(_owner_id, photo_id)))
+            # check photo_id in database
+            if is_photo_posted_by_id(_owner_id, photo_id):
+                _LOGGER.debug("{} has been posted before".
+                              format(build_photo_url(_owner_id, photo_id)))
                 continue
 
-            photo_url = get_widest_photo_url(item['sizes'])
-            photo_hash = check_photo.check_photo_hash(_HASH_FILENAME, photo_url)
-            if not photo_hash:
-                _LOGGER.debug("{} hash in hash file".format(build_photo_url(_owner_id, photo_id)))
-                continue
+            is_duplicate = False
+            photo_hash = get_photo_hash(get_widest_photo_url(item['sizes']))
+            prev_by_hash = is_photo_posted_by_hash(photo_hash)
+            prev_tg_post = None
+            prev_tg_date = None
+            if prev_by_hash:
+                _LOGGER.debug("{} photo with exactly same hash has been posted before".
+                              format(build_photo_url(_owner_id, photo_id)))
+                prev_tg_post = prev_by_hash['tg_post_id']
+                prev_tg_date = prev_by_hash['date']
+                is_duplicate = True
 
             comments_for_photo = [x for x in comments if x['photo_id'] == photo_id][0]['comments']['items']
 
@@ -328,13 +333,21 @@ def get_goods_from_album(_owner_id, _album_id):
             new_goods_list.append({
                 'photo': item,
                 'owner_id': _owner_id,
+
                 'seller_id': seller_id,
                 'seller_info': seller_info,
+
                 'album_name': album_name,
                 'group_name': group_name,
+
                 'comments': comments_for_photo,
-                'hash': photo_hash
+
+                'hash': photo_hash,
+                'duplicate': is_duplicate,
+                'prev_tg_post': prev_tg_post,
+                'prev_tg_date': prev_tg_date
             })
+
         elif diff < _TIMEOUT_FOR_PHOTO_SECONDS:
             _LOGGER.debug("{} too yong ({} seconds of life)".format(
                 build_photo_url(_owner_id, photo_id), diff)
@@ -386,28 +399,7 @@ def post_telegram(_good):
         sent = barahl0bot.post_to_channel_html(message, channel)
         # if we sent message than write hash of photo for future
         logging.debug(sent)
-        if sent:
-            photo_id = _good['photo']['id']
-            check_photo.add_photo_to_last(
-                _LAST_FILENAME, owner_id, photo_id, _LAST_FILENAME_RESTRICTION
-            )
-            check_photo.add_photo_hash(_HASH_FILENAME, _good['hash'])
-
-
-def post_vk(_good):
-    # if 'photo' not in _good:
-    #     return None
-
-    club_id = -192690840
-
-    photo = _good['photo']
-    photo_id = photo['id']
-    owner_id = _good['owner_id']
-
-    message = build_message_vk(_good)
-    attachments = "photo{}_{}".format(owner_id, photo_id)
-
-    _VK_API_WALL.wall.post(owner_id=club_id, from_group=1, message=message, attachments=attachments)
+        return sent
 
 
 def process_album(_owner_id, _album_id):
@@ -421,8 +413,22 @@ def process_album(_owner_id, _album_id):
             photo_id = g['photo']['id']
             _LOGGER.info(build_photo_url(_owner_id, photo_id))
 
+        now = datetime.datetime.now()
         for g in goods:
-            post_telegram(g)
+            # if duplicate but was more than week ago then post
+            if g['duplicate']:
+                prev_tg_date = g['prev_tg_date']
+                if not prev_tg_date:
+                    continue
+                diff = now - prev_tg_date
+                if diff.days < 7:
+                    continue
+            sent = post_telegram(g)
+            if sent:
+                tg_post_id = sent['message_id']
+                g['tg_post_id'] = tg_post_id
+
+                save_good_to_db(g)
 
             # if too many new goods lets sleep between message send for
             # telegram to be chill

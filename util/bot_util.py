@@ -109,3 +109,11 @@ def save_json_file(filename, data):
     json_f = open(filename, 'w')
     json_f.write(json_txt)
     json_f.close()
+
+
+def tg_date_to_mysql(_date):
+    ds = _date.split(' ')
+    dmy = ds[0].split('.')
+    hms = ds[1]
+    # YYYY-MM-DD hh:mm:ss
+    return "{}-{}-{} {}".format(dmy[2], dmy[1], dmy[0], hms)
