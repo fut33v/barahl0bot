@@ -1,9 +1,8 @@
 from bs4 import BeautifulSoup, NavigableString, Tag
 import re
-import os
 import glob
 import sys
-
+import os
 
 from util import bot_util
 
@@ -112,20 +111,18 @@ def process_html(_filename):
         # print(good)
         goods_list.append(good)
 
-    json_filename = _filename.split(".")[0] + ".json"
+    json_filename = os.path.splitext(_filename)[0] + ".json"
     bot_util.save_json_file(json_filename, goods_list)
 
 
 if __name__ == "__main__":
-    # if len(sys.argv) < 2:
-    #     print("give me directory of exported chat with message*.html")
-    #     exit(-1)
+    if len(sys.argv) < 2:
+        print("give me directory of exported chat with message*.html")
+        exit(-1)
 
-    # dir_name = sys.argv[1]
+    dir_name = sys.argv[1]
 
-    dir_name = "chat_export/"
-    html_files = glob.glob(dir_name + "*.html")
-    # to_parse_files = html_files[:1]
+    html_files = glob.glob(os.path.join(dir_name, "messages*.html"))
     to_parse_files = html_files
 
     print(to_parse_files)

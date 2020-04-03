@@ -1,5 +1,7 @@
 import glob
 import hashlib
+import os
+import sys
 from util import bot_util
 
 
@@ -14,13 +16,16 @@ def get_photo_hash(_url):
 
 
 if __name__ == "__main__":
-    dir_name = "../chat_export/"
-    # messages = glob.glob(dir_name + "messages*.json")
-    messages = [dir_name + "messages35.json"]
+    if len(sys.argv) < 2:
+        print("give me directory with .json files with messages from channel")
+        exit(-1)
 
-    for m in messages:
-        print(m)
-        goods = bot_util.load_json_file(m)
+    dir_name = sys.argv[1]
+    messages = glob.glob(os.path.join(dir_name, "messages*.json"))
+
+    for messages_json_filename in messages:
+        print(messages_json_filename)
+        goods = bot_util.load_json_file(messages_json_filename)
         goods_count = len(goods)
         i = 0
         for g in goods:
@@ -32,4 +37,6 @@ if __name__ == "__main__":
             print(i, "/", goods_count, " ", photo_hash)
             i += 1
 
-        bot_util.save_json_file(m+'.hash.json', goods)
+        json_filename = os.path.splitext(messages_json_filename)[0] + "_hash.json"
+        bot_util.save_json_file(json_filename, goods)
+        os.remove(messages_json_filename)

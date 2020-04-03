@@ -74,9 +74,32 @@ def is_photo_posted_by_id(_owner_id, _photo_id):
     return False
 
 
+class Album:
+    def __init__(self, _owner_id, _album_id):
+        self.owner_id = _owner_id
+        self.album_id = _album_id
+
+    def build_url(self):
+        return "https://vk.com/album{}_{}".format(self.owner_id, self.album_id)
+
+
+def get_albums_list():
+    with _CONNECTION.cursor() as cursor:
+        sql = "SELECT * FROM `albums`"
+        cursor.execute(sql)
+        result = cursor.fetchall()
+        if result:
+            albums = []
+            for a in result:
+                owner_id = a[0]
+                album_id = a[1]
+                albums.append(Album(owner_id, album_id))
+            return albums
+    return False
+
+
 def is_photo_posted_by_hash(_hash):
     with _CONNECTION.cursor() as cursor:
-        # Read a single record
         sql = "SELECT `tg_post_id`,`date` FROM `goods` WHERE `hash`=%s ORDER BY date DESC"
         cursor.execute(sql, (_hash,))
         result = cursor.fetchone()
@@ -147,10 +170,6 @@ def get_good_comments_text(_good, _restrict=True):
         comments_str = make_numbers_bold(comments_str)
 
     return comments_str
-
-
-def build_album_url(_owner_id, _album_id):
-    return "https://vk.com/album{}_{}".format(_owner_id, _album_id)
 
 
 def build_photo_url(_owner_id, _photo_id):
@@ -402,16 +421,19 @@ def post_telegram(_good):
         return sent
 
 
-def process_album(_owner_id, _album_id):
+def process_album(_album):
 
-    goods = get_goods_from_album(_owner_id, _album_id)
+    owner_id = _album.owner_id
+    album_id = _album.album_id
+
+    goods = get_goods_from_album(owner_id, album_id)
 
     if goods:
         _LOGGER.info((len(goods), "New goods:"))
 
         for g in goods:
             photo_id = g['photo']['id']
-            _LOGGER.info(build_photo_url(_owner_id, photo_id))
+            _LOGGER.info(build_photo_url(owner_id, photo_id))
 
         now = datetime.datetime.now()
         for g in goods:
@@ -446,24 +468,12 @@ def main_loop():
             remove_logger_handlers()
             set_logger_handlers()
 
-        with open(barahl0bot.ALBUMS_FILENAME, "r") as albums_file:
-            lines = albums_file.readlines()
-            for album_line in lines:
-                album_line = album_line.rstrip()
-                oa_id = album_line.split('_')
-                if len(oa_id) < 2:
-                    continue
-                owner_id = int(oa_id[0])
-                album_id = oa_id[1]
-                if album_id == "00":
-                    album_id = "wall"
-
-                _LOGGER.info("Getting photos from album: {}".format(build_album_url(owner_id, album_id)))
-
-                process_album(owner_id, album_id)
-
-                _LOGGER.info("Sleep for {} seconds before next album".format(_SECONDS_TO_SLEEP_BETWEEN_ALBUMS))
-                time.sleep(_SECONDS_TO_SLEEP_BETWEEN_ALBUMS)
+        albums = get_albums_list()
+        for a in albums:
+            _LOGGER.info("Getting photos from album: {}".format(a.build_url()))
+            process_album(a)
+            _LOGGER.info("Sleep for {} seconds before next album".format(_SECONDS_TO_SLEEP_BETWEEN_ALBUMS))
+            time.sleep(_SECONDS_TO_SLEEP_BETWEEN_ALBUMS)
 
         previous_day = datetime.datetime.now().day
 

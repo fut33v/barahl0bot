@@ -2,6 +2,8 @@ from util import bot_util
 
 import pymysql
 import glob
+import sys
+import os
 
 connection = pymysql.connect(host='localhost', user='fut33v', password='', db='barahlochannel', charset='utf8mb4')
 
@@ -35,16 +37,21 @@ def sellers_to_mysql(sellers):
 
 
 if __name__ == "__main__":
-    dir_name = "../chat_export/"
-    sellers_filename = dir_name + "sellers.json"
-    sellers = bot_util.load_json_file(sellers_filename)
+    if len(sys.argv) < 2:
+        print("give me directory with .json files (with hash) with messages from channel")
+        exit(-1)
+
+    dir_name = sys.argv[1]
+
+    messages = glob.glob(os.path.join(dir_name, "messages*hash.json"))
+
+    # sellers_filename = os.path.join(dir_name, "sellers.json")
+    # sellers = bot_util.load_json_file(sellers_filename)
     # sellers_to_mysql(sellers)
 
-    messages = glob.glob(dir_name + "messages*.json")
-
-    for m in messages:
-        print(m)
-        goods = bot_util.load_json_file(m)
+    for messages_json_filename in messages:
+        print(messages_json_filename)
+        goods = bot_util.load_json_file(messages_json_filename)
         for g in goods:
             if len(g['seller']) <= 17:
                 continue
@@ -59,8 +66,10 @@ if __name__ == "__main__":
             tg_post_id = g['message_id']
             date = bot_util.tg_date_to_mysql(g['date'])
 
-            sql = 'INSERT INTO goods VALUES("{}", "{}", {}, "{}", {}, "{}");'.\
-                format(vk_photo_id, photo_link_jpg, seller_id, description, tg_post_id, date)
+            photo_hash = g['hash']
+
+            sql = 'INSERT INTO goods VALUES("{}", "{}", {}, "{}", {}, "{}", "{}");'.\
+                format(vk_photo_id, photo_link_jpg, seller_id, description, tg_post_id, date, photo_hash)
 
             print(sql)
 
