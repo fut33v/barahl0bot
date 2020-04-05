@@ -3,7 +3,7 @@ import hashlib
 import os
 import sys
 from util import bot_util
-
+import re
 
 def get_photo_hash(_url):
     photo = bot_util.urlopen(_url)
@@ -22,6 +22,9 @@ if __name__ == "__main__":
 
     dir_name = sys.argv[1]
     messages = glob.glob(os.path.join(dir_name, "messages*.json"))
+    regexp_hash = re.compile("hash")
+    messages = [x for x in messages if not regexp_hash.search(x)]
+    # messages = glob.glob(os.path.join(dir_name, "messages25.json"))
 
     for messages_json_filename in messages:
         print(messages_json_filename)

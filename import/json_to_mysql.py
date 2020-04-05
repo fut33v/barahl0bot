@@ -23,7 +23,7 @@ def sellers_to_mysql(sellers):
         vk_id = int(s['id'])
 
         try:
-            sql = 'INSERT INTO sellers VALUES({}, "{}", "{}", {}, "{}");'.format(vk_id, full_name, city, 0, photo)
+            sql = 'INSERT INTO sellers VALUES({}, "{}", "{}", "{}");'.format(vk_id, full_name, city, photo)
             print(sql)
             cur.execute(sql)
             print("The query affected {} rows".format(cur.rowcount))
@@ -37,17 +37,14 @@ def sellers_to_mysql(sellers):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("give me directory with .json files (with hash) with messages from channel")
+    if len(sys.argv) < 3:
+        print("give me directory with .json files (with hash) with messages from channel and channel name")
         exit(-1)
 
     dir_name = sys.argv[1]
+    tg_channel = sys.argv[2]
 
     messages = glob.glob(os.path.join(dir_name, "messages*hash.json"))
-
-    # sellers_filename = os.path.join(dir_name, "sellers.json")
-    # sellers = bot_util.load_json_file(sellers_filename)
-    # sellers_to_mysql(sellers)
 
     for messages_json_filename in messages:
         print(messages_json_filename)
@@ -68,8 +65,8 @@ if __name__ == "__main__":
 
             photo_hash = g['hash']
 
-            sql = 'INSERT INTO goods VALUES("{}", "{}", {}, "{}", {}, "{}", "{}");'.\
-                format(vk_photo_id, photo_link_jpg, seller_id, description, tg_post_id, date, photo_hash)
+            sql = 'INSERT INTO goods VALUES("{}", "{}", {}, "{}", {}, "{}", "{}", "{}");'.\
+                format(vk_photo_id, photo_link_jpg, seller_id, description, tg_post_id, date, photo_hash, tg_channel)
 
             print(sql)
 
@@ -81,6 +78,10 @@ if __name__ == "__main__":
                 print("The query affected {} rows".format(cur.rowcount))
             except pymysql.err.IntegrityError as e:
                 print(e)
+
+    sellers_filename = os.path.join(dir_name, "sellers.json")
+    sellers = bot_util.load_json_file(sellers_filename)
+    sellers_to_mysql(sellers)
 
     connection.commit()
 

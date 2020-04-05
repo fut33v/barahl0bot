@@ -15,24 +15,6 @@ ALBUMS_FILENAME = DATA_DIRNAME + 'albums'
 REGEXP_ALBUM = re.compile("http[s]?://vk.com/album(-?\d*_\d*)")
 
 
-def init_setting(_name_string):
-    if _name_string in SETTINGS:
-        return SETTINGS[_name_string]
-    return None
-
-
-_SETTINGS_JSON_FILENAME = "settings.json"
-SETTINGS = bot_util.load_json_file(_SETTINGS_JSON_FILENAME)
-ADMINS = set(SETTINGS['admins'])
-CHANNELS = set(SETTINGS['channels'])
-TOKEN = SETTINGS['token']
-TOKEN_VK = SETTINGS['token_vk']
-ERROR_CHANNEL = init_setting('error_channel')
-TOKEN_VK_WALL = init_setting('token_vk_wall')
-
-SECONDS_TO_SLEEP = SETTINGS['seconds_to_sleep']
-
-
 def start_handler(update, context):
     response = """
     
@@ -163,16 +145,6 @@ def add_item_process_approve(update, context):
 
 def cancel_handler(update, context):
     return ConversationHandler.END
-
-
-def post_to_channel_html(message, channel):
-    bot = telegram.Bot(token=TOKEN)
-    return bot.send_message(channel, message, parse_mode=telegram.ParseMode.HTML)
-
-
-def post_to_error_channel(message):
-    bot = telegram.Bot(token=TOKEN)
-    return bot.send_message(ERROR_CHANNEL, message, parse_mode=telegram.ParseMode.MARKDOWN)
 
 
 if __name__ == "__main__":
