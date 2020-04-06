@@ -65,9 +65,8 @@ def edit_message_channel_html(message_id, message_text, channel):
             chat_id='@' + channel,  message_id=message_id, text=message_text, parse_mode=telegram.ParseMode.HTML
         )
         return result
-    # telegram.
-    except telegram.error.BadRequest as br:
-        _LOGGER.warning(br)
+    except telegram.error.TelegramError as te:
+        _LOGGER.warning(te)
 
 
 def post_to_error_channel(message):
@@ -134,7 +133,7 @@ def get_products_from_album(_album):
                 if edit_message_channel_html(message_id=product_from_db.tg_post_id, message_text=message_text, channel=_CHANNEL):
                     _LOGGER.debug(
                         "Edited message https://t.me/{}/{} for photo {}".format(
-                            product_from_db.tg_post_id, photo.build_url(), _CHANNEL))
+                            _CHANNEL, product_from_db.tg_post_id, photo.build_url()))
                 continue
 
             is_duplicate = False
