@@ -130,10 +130,16 @@ def get_products_from_album(_album):
                 product.comments_text = product_from_db.comments_text
 
                 message_text = product.build_message_telegram(_CHANNEL)
+
+                # let's not bother telegram...
+                _LOGGER.debug("Sleep before telegram message edit")
+                time.sleep(3)
+
                 if edit_message_channel_html(message_id=product_from_db.tg_post_id, message_text=message_text, channel=_CHANNEL):
                     _LOGGER.debug(
                         "Edited message https://t.me/{}/{} for photo {}".format(
                             _CHANNEL, product_from_db.tg_post_id, photo.build_url()))
+                    # TODO: update text and comments in database!!!
                 continue
 
             is_duplicate = False
