@@ -1,6 +1,8 @@
 import calendar
 import json
 import os
+import re
+import hashlib
 import urllib.error
 import urllib.error
 import urllib.parse
@@ -15,6 +17,10 @@ import pytz
 from functools import partial
 
 __author__ = 'fut33v'
+
+
+_REGEX_HTTP = re.compile("http")
+_REGEX_HTTPS = re.compile("https")
 
 
 def urlopen(url, data=None):
@@ -117,3 +123,41 @@ def tg_date_to_mysql(_date):
     hms = ds[1]
     # YYYY-MM-DD hh:mm:ss
     return "{}-{}-{} {}".format(dmy[2], dmy[1], dmy[0], hms)
+
+
+def make_numbers_bold(_text):
+    if not isinstance(_text, str):
+        return _text
+    _tokens = _text.split(' ')
+    _tokens_bold = []
+    for t in _tokens:
+        is_digit = False
+        # is_link = False
+        for c in t:
+            if c.isdigit():
+                is_digit = True
+        h1 = _REGEX_HTTP.findall(t)
+        h2 = _REGEX_HTTPS.findall(t)
+        if len(h1) > 0 or len(h2) > 0:
+            # is_link = True
+            is_digit = False
+        if is_digit:
+            _tokens_bold.append("<b>" + t + "</b>")
+        else:
+            _tokens_bold.append(t)
+
+    result = str()
+    for t in _tokens_bold:
+        result += t + " "
+
+    return result
+
+
+def get_photo_hash(url):
+    photo = urlopen(url)
+    if not photo:
+        return None
+    sha = hashlib.sha256()
+    sha.update(photo)
+    h = sha.hexdigest()
+    return h

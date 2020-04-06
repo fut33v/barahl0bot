@@ -1,9 +1,13 @@
-from util import bot_util
+import util
+
+COMMENTS_STRING_RESTRICTION = 600
+DESCRIPTION_STRING_RESTRICTION = 600
+DESCRIPTION_PLUS_COMMENTS_STRING_RESTRICTION = 700
 
 
 class Barahl0botSettings:
     def __init__(self, _filename):
-        self._settings = bot_util.load_json_file(_filename)
+        self._settings = util.load_json_file(_filename)
         self.token_telegram = self._settings['token_telegram']
         self.token_vk = self._settings['token_vk']
 
