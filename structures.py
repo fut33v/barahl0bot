@@ -22,34 +22,46 @@ class Album:
 
 
 class Seller:
-    def __init__(self, _users_get_result):
+    def __init__(self, users_get_result=None):
         self.vk_id = None
         self.first_name = None
         self.last_name = None
         self.city = None
 
-        if "id" in _users_get_result:
-            self.vk_id = _users_get_result["id"]
-        if "first_name" in _users_get_result:
-            self.first_name = _users_get_result["first_name"]
-        if "last_name" in _users_get_result:
-            self.last_name = _users_get_result["last_name"]
-        if "city" in _users_get_result:
-            if "title" in _users_get_result["city"]:
-                self.city = _users_get_result["city"]["title"]
+        if users_get_result:
+            if "id" in users_get_result:
+                self.vk_id = users_get_result["id"]
+            if "first_name" in users_get_result:
+                self.first_name = users_get_result["first_name"]
+            if "last_name" in users_get_result:
+                self.last_name = users_get_result["last_name"]
+            if "city" in users_get_result:
+                if "title" in users_get_result["city"]:
+                    self.city = users_get_result["city"]["title"]
+
+    def is_club(self):
+        if self.vk_id < 0:
+            return True
+        return False
 
 
 class Product:
-    def __init__(self, _album, _photo, _comments, _seller, _photo_hash):
-        self.album = _album
-        self.photo = _photo
-        self.comments = _comments
-        self.seller = _seller
-        self.photo_hash = _photo_hash
+    def __init__(self, album=None, photo=None, comments=None, seller=None, photo_hash=None):
+        self.album = album
+        self.photo = photo
+        self.comments = comments
+        self.seller = seller
+        self.photo_hash = photo_hash
 
         self.is_duplicate = False
         self.prev_tg_post = None
         self.prev_tg_date = None
+
+        self.descr = None
+        self.comments_text = None
+
+        if self.comments:
+            self.comments_text = self.get_comments_text(self.comments)
 
     def get_comments_text(self, _restrict=True):
         if self.seller:
@@ -72,7 +84,7 @@ class Product:
             comments_str = comments_str.lower()
             comments_str = comments_str.replace('\n', ' ')
             comments_str = html.escape(comments_str)
-            comments_str = make_numbers_bold(comments_str)
+            # comments_str = make_numbers_bold(comments_str)
 
         return comments_str
 
@@ -86,7 +98,7 @@ class Product:
         if _restrict:
             text = text[:settings.DESCRIPTION_STRING_RESTRICTION]
         text = html.escape(text)
-        text = make_numbers_bold(text)
+        # text = make_numbers_bold(text)
 
         return text
 
@@ -109,14 +121,16 @@ class Product:
 
         text = self.get_description_text()
         if text:
+            text = make_numbers_bold(text)
             latest_product += "<b>Описание:</b> " + text + "\n\n"
 
         comments_str = self.get_comments_text()
         if comments_str and len(comments_str) + len(text) < settings.DESCRIPTION_PLUS_COMMENTS_STRING_RESTRICTION:
+            comments_str = make_numbers_bold(comments_str)
             latest_product += "<b>Каменты:</b> " + comments_str + "\n\n"
 
         # _OWNER_ID_POST_BY_GROUP_ADMIN
-        if not self.seller:
+        if self.seller.is_club():
             latest_product += \
                 "<b>Продавец:</b> <a href=\"https://vk.com/club{}\">{}</a>".format(
                     -owner_id, group_name)

@@ -1,6 +1,6 @@
 import logging
 import pymysql
-from structures import Album
+from structures import Album, Product, Seller
 
 _LOGGER = logging.getLogger("barahl0bot")
 
@@ -21,8 +21,16 @@ class Barahl0botDatabase:
             cursor.execute(sql, (photo_id_str, self._channel))
             result = cursor.fetchone()
             if result:
-                # print("found by id:", result)
-                return True
+                seller = Seller()
+                seller.vk_id = result[2]
+                photo_hash = result[6]
+
+                product = Product(seller=seller, photo_hash=photo_hash)
+                product.descr = result[3]
+                product.comments_text = result[8]
+                product.tg_post_id = result[4]
+
+                return product
 
         return False
 
@@ -59,8 +67,9 @@ class Barahl0botDatabase:
             _LOGGER.warning("Trying to add good without seller")
             return
 
+        # if _product.photo.owner_id < 0:
         # if seller is group/public/community
-        if _product.photo.owner_id < 0:
+        if _product.seller.is_club():
             seller_id = _product.photo.owner_id
         else:
             seller_id = int(_product.seller.vk_id)
@@ -73,12 +82,12 @@ class Barahl0botDatabase:
         photo_link = photo.get_widest_photo_url()
         photo_hash = _product.photo_hash
 
-        descr = ""
-        descr += _product.get_description_text()
-        descr += _product.get_comments_text()
+        descr = _product.get_description_text()
+        comments = _product.get_comments_text()
 
         with self._connection.cursor() as cursor:
-            sql = 'INSERT INTO `goods` VALUES(%s, %s, %s, %s, %s, NOW(), %s, %s);'
-            cursor.execute(sql, (vk_photo_id, photo_link, seller_id, descr, tg_post_id, photo_hash, self._channel))
+            sql = 'INSERT INTO `goods` VALUES(%s, %s, %s, %s, %s, NOW(), %s, %s, %s);'
+            cursor.execute(sql, (
+                vk_photo_id, photo_link, seller_id, descr, tg_post_id, photo_hash, self._channel, comments))
 
         self._connection.commit()

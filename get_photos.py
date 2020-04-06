@@ -2,10 +2,11 @@ import time
 import logging
 import datetime
 import os
-import hashlib
+import traceback
 
 import vk_api
 import telegram.ext
+import telegram.error
 
 from settings import Barahl0botSettings
 from database import Barahl0botDatabase
@@ -46,9 +47,27 @@ _FH_DEBUG = None
 _FH_ERROR = None
 
 
+def get_seller_from_vk(_seller_id):
+    seller_info = _VK_API.users.get(user_ids=_seller_id, fields='city')[0]
+    seller = Seller(seller_info)
+    return seller
+
+
 def post_to_channel_html(message, channel):
     bot = telegram.Bot(token=_TOKEN_TELEGRAM)
     return bot.send_message('@' + channel, message, parse_mode=telegram.ParseMode.HTML)
+
+
+def edit_message_channel_html(message_id, message_text, channel):
+    bot = telegram.Bot(token=_TOKEN_TELEGRAM)
+    try:
+        result = bot.edit_message_text(
+            chat_id='@' + channel,  message_id=message_id, text=message_text, parse_mode=telegram.ParseMode.HTML
+        )
+        return result
+    # telegram.
+    except telegram.error.BadRequest as br:
+        _LOGGER.warning(br)
 
 
 def post_to_error_channel(message):
@@ -76,9 +95,6 @@ def get_products_from_album(_album):
         return None
 
     for vk_photo_dict in photos:
-        # if 'date' not in vk_photo_dict and 'id' not in vk_photo_dict:
-        #     _LOGGER.error("no 'date' and 'id' in photo!")
-        #     continue
 
         photo = Photo(vk_photo_dict)
 
@@ -86,9 +102,39 @@ def get_products_from_album(_album):
         diff = now_timestamp - photo.date
 
         if _TIMEOUT_FOR_PHOTO_SECONDS < diff < _TOO_OLD_FOR_PHOTO_SECONDS:
+
+            comments_for_photo = [x for x in comments if x['photo_id'] == photo.photo_id][0]['comments']['items']
+
+            product = Product(album=_album, photo=photo, comments=comments_for_photo)
+
             # check photo_id in database
-            if _DATABASE.is_photo_posted_by_id(photo):
-                _LOGGER.debug("{} has been posted before".format(photo.build_url()))
+            product_from_db = _DATABASE.is_photo_posted_by_id(photo)
+            if product_from_db:
+                # _LOGGER.debug("{} has been posted before".format(photo.build_url()))
+
+                seller = product_from_db.seller
+                # get seller from db, if not then add it (this code should be above
+                if not product_from_db.seller.is_club():
+                    seller = get_seller_from_vk(product_from_db.seller.vk_id)
+
+                product.seller = seller
+
+                x1 = product.get_comments_text()
+                x2 = product_from_db.comments_text
+                same_comments = product.get_comments_text() == product_from_db.comments_text
+                same_text = product.get_description_text() == product_from_db.descr
+
+                if same_comments and same_text:
+                    continue
+
+                product.photo_hash = product_from_db.photo_hash
+                product.comments_text = product_from_db.comments_text
+
+                message_text = product.build_message_telegram(_CHANNEL)
+                if edit_message_channel_html(message_id=product_from_db.tg_post_id, message_text=message_text, channel=_CHANNEL):
+                    _LOGGER.debug(
+                        "Edited message https://t.me/{}/{} for photo {}".format(
+                            product_from_db.tg_post_id, photo.build_url(), _CHANNEL))
                 continue
 
             is_duplicate = False
@@ -97,12 +143,10 @@ def get_products_from_album(_album):
             prev_tg_post = None
             prev_tg_date = None
             if prev_by_hash:
-                _LOGGER.debug("{} photo with exactly same hash has been posted before".format(photo.build_url()))
+                # _LOGGER.debug("{} photo with exactly same hash has been posted before".format(photo.build_url()))
                 prev_tg_post = prev_by_hash['tg_post_id']
                 prev_tg_date = prev_by_hash['date']
                 is_duplicate = True
-
-            comments_for_photo = [x for x in comments if x['photo_id'] == photo.photo_id][0]['comments']['items']
 
             # if user album (id of owner is positive) and 'user_id' not in photo
             if _album.owner_id > 0:
@@ -116,22 +160,20 @@ def get_products_from_album(_album):
                 # get user info here
                 seller_info = _VK_API.users.get(user_ids=seller_id, fields='city')[0]
                 seller = Seller(seller_info)
+            else:
+                seller = Seller()
+                seller.vk_id = photo.owner_id
 
-            product = Product(
-                _album=_album,
-                _photo=photo,
-                _comments=comments_for_photo,
-                _seller=seller,
-                _photo_hash=photo_hash,
-            )
+            product.seller = seller
+            product.photo_hash = photo_hash
             product.is_duplicate = is_duplicate
             product.prev_tg_date = prev_tg_date
             product.prev_tg_post = prev_tg_post
 
             new_products_list.append(product)
 
-        elif diff < _TIMEOUT_FOR_PHOTO_SECONDS:
-            _LOGGER.debug("{} too yong ({} seconds of life)".format(photo.build_url(), diff))
+        # elif diff < _TIMEOUT_FOR_PHOTO_SECONDS:
+        #     _LOGGER.debug("{} too yong ({} seconds of life)".format(photo.build_url(), diff))
 
     return new_products_list
 
@@ -227,28 +269,28 @@ def main_loop():
 
 if __name__ == "__main__":
 
-    # try:
-    if not os.path.exists(_LOGS_DIR):
-        os.mkdir(_LOGS_DIR)
+    try:
+        if not os.path.exists(_LOGS_DIR):
+            os.mkdir(_LOGS_DIR)
 
-    logging.basicConfig(format='%(levelname)s %(asctime)s %(message)s', datefmt='%d/%m/%Y %H:%M:%S ')
-    logging.getLogger().setLevel(logging.ERROR)
+        logging.basicConfig(format='%(levelname)s %(asctime)s %(message)s', datefmt='%d/%m/%Y %H:%M:%S ')
+        logging.getLogger().setLevel(logging.ERROR)
 
-    _LOGGER.setLevel(logging.DEBUG)
-    formatter = logging.Formatter('%(levelname)s %(asctime)s %(message)s')
+        _LOGGER.setLevel(logging.DEBUG)
+        formatter = logging.Formatter('%(levelname)s %(asctime)s %(message)s')
 
-    set_logger_handlers()
+        set_logger_handlers()
 
-    main_loop()
+        main_loop()
 
-    # except Exception as e:
-    #     tb_ex = traceback.extract_tb(e.__traceback__)
-    #
-    #     error_message = "```"
-    #     for f in tb_ex:
-    #         error_message += " {}:{}\n    {}".format(f.filename, f.lineno, f.line)
-    #     error_message += "```"
-    #
-    #     post_to_error_channel(error_message)
-    #
-    #     raise
+    except Exception as e:
+        tb_ex = traceback.extract_tb(e.__traceback__)
+
+        error_message = "```"
+        for f in tb_ex:
+            error_message += " {}:{}\n    {}".format(f.filename, f.lineno, f.line)
+        error_message += "```"
+
+        post_to_error_channel(error_message)
+
+        raise
