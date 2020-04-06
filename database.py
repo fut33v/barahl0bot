@@ -21,7 +21,7 @@ class Barahl0botDatabase:
             cursor.execute(sql, (photo_id_str, self._channel))
             result = cursor.fetchone()
             if result:
-                print("found by id:", result)
+                # print("found by id:", result)
                 return True
 
         return False
@@ -55,15 +55,20 @@ class Barahl0botDatabase:
         return False
 
     def insert_product(self, _product):
-        if not _product.seller:
+        if not _product.seller and _product.photo.owner_id > 0:
             _LOGGER.warning("Trying to add good without seller")
             return
 
-        photo = _product.photo
+        # if seller is group/public/community
+        if _product.photo.owner_id < 0:
+            seller_id = _product.photo.owner_id
+        else:
+            seller_id = int(_product.seller.vk_id)
+
         owner_id = str(_product.album.owner_id)
+        photo = _product.photo
         photo_id = str(photo.photo_id)
         vk_photo_id = owner_id + "_" + photo_id
-        seller_id = int(_product.seller.vk_id)
         tg_post_id = int(_product.tg_post_id)
         photo_link = photo.get_widest_photo_url()
         photo_hash = _product.photo_hash

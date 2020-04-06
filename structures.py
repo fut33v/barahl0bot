@@ -52,7 +52,11 @@ class Product:
         self.prev_tg_date = None
 
     def get_comments_text(self, _restrict=True):
-        seller_id = self.seller.vk_id
+        if self.seller:
+            seller_id = self.seller.vk_id
+        else:
+            # in case of group/public/community photo
+            seller_id = self.photo.owner_id
         comments = self.comments
 
         comments_str = ""
@@ -121,8 +125,8 @@ class Product:
                 "<b>Продавец:</b> <a href=\"https://vk.com/id{}\">{} {}</a>".format(
                     seller.vk_id, seller.first_name, seller.last_name)
 
-        if seller.city:
-            latest_product += " ({})".format(seller.city)
+            if seller.city:
+                latest_product += " ({})".format(seller.city)
 
         latest_product += "\n"
 

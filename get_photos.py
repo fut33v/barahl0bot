@@ -163,7 +163,7 @@ def set_logger_handlers():
 
 
 def post_telegram(_product):
-    message = _product.build_message_telegram()
+    message = _product.build_message_telegram(_CHANNEL)
     if not message:
         return None
     sent = post_to_channel_html(message, _CHANNEL)
@@ -174,7 +174,7 @@ def process_album(_album):
     products = get_products_from_album(_album)
 
     if products:
-        _LOGGER.info("{} New goods:", len(products))
+        _LOGGER.info("{} New goods:".format(len(products)))
 
         for p in products:
             _LOGGER.info(p.photo.build_url())
