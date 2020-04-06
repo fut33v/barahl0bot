@@ -140,6 +140,7 @@ def get_products_from_album(_album):
                         "Edited message https://t.me/{}/{} for photo {}".format(
                             _CHANNEL, product_from_db.tg_post_id, photo.build_url()))
                     # TODO: update text and comments in database!!!
+                    _DATABASE.update_product_text_and_comments(product)
                 continue
 
             is_duplicate = False

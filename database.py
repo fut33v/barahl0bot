@@ -91,3 +91,18 @@ class Barahl0botDatabase:
                 vk_photo_id, photo_link, seller_id, descr, tg_post_id, photo_hash, self._channel, comments))
 
         self._connection.commit()
+
+    def update_product_text_and_comments(self, product):
+        owner_id = str(product.album.owner_id)
+        photo = product.photo
+        photo_id = str(photo.photo_id)
+        vk_photo_id = owner_id + "_" + photo_id
+        text = product.get_description_text()
+        comments = product.get_comments_text()
+        with self._connection.cursor() as cursor:
+            sql = "UPDATE goods SET descr = '{text}', comments = '{comments}' WHERE vk_photo_id = '{vk_photo_id}';".\
+                format(vk_photo_id=vk_photo_id, text=text, comments=comments)
+            print(sql)
+            cursor.execute(sql)
+        self._connection.commit()
+
