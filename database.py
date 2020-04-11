@@ -10,7 +10,68 @@ class Barahl0botDatabase:
         self._connection = pymysql.connect(host='localhost', user='fut33v', password='', db='barahlochannel',
                                            charset='utf8mb4')
         self._channel = _channel
+        self._albums_table = self._channel + "_albums"
         return
+
+    def get_albums_list(self):
+        with self._connection.cursor() as cursor:
+            sql = "SELECT * FROM {} ORDER BY owner_id".format(self._albums_table)
+            cursor.execute(sql)
+            result = cursor.fetchall()
+            if result:
+                albums = []
+                for a in result:
+                    owner_id = a[0]
+                    album_id = a[1]
+                    albums.append(Album(owner_id, album_id))
+                return albums
+        return False
+
+    def is_album_in_table(self, album):
+        with self._connection.cursor() as cursor:
+            sql = "SELECT * FROM {t} WHERE owner_id = %s AND album_id = %s;". \
+                format(t=self._albums_table)
+            #, oi=album.owner_id, ai=album.album_id)
+            cursor.execute(sql, (album.owner_id, album.album_id))
+            result = cursor.fetchone()
+            return result
+
+    def insert_album(self, album):
+        try:
+            with self._connection.cursor() as cursor:
+                sql = 'INSERT INTO {t} (' \
+                      'owner_id, ' \
+                      'album_id,' \
+                      'title,' \
+                      'description,' \
+                      'photo) ' \
+                      'VALUES(%s, %s, %s, %s, %s);'.\
+                    format(t=self._albums_table)
+
+                cursor.execute(sql, (album.owner_id, album.album_id, album.title, album.description, album.photo))
+
+            self._connection.commit()
+        except pymysql.Error as e:
+            print(e)
+
+    def delete_album(self, album):
+        with self._connection.cursor() as cursor:
+            sql = 'DELETE FROM {t} WHERE owner_id=%s AND album_id=%s;'.format(t=self._albums_table)
+            result = cursor.execute(sql, (album.owner_id, album.album_id))
+            self._connection.commit()
+            return result
+
+    def is_photo_posted_by_hash(self, _hash):
+        with self._connection.cursor() as cursor:
+            sql = "SELECT `tg_post_id`,`date` FROM `goods` WHERE `hash`=%s AND tg_channel=%s ORDER BY date DESC"
+            cursor.execute(sql, (_hash, self._channel))
+            result = cursor.fetchone()
+            if result:
+                return {
+                    'date': result[1],
+                    'tg_post_id': result[0]
+                }
+        return False
 
     def is_photo_posted_by_id(self, _photo):
         photo_id_str = _photo.get_photo_id_str()
@@ -32,34 +93,6 @@ class Barahl0botDatabase:
 
                 return product
 
-        return False
-
-    def get_albums_list(self):
-        with self._connection.cursor() as cursor:
-            albums_table = self._channel + "_albums"
-            sql = "SELECT * FROM {}".format(albums_table)
-            # cursor.execute(sql, albums_table)
-            cursor.execute(sql)
-            result = cursor.fetchall()
-            if result:
-                albums = []
-                for a in result:
-                    owner_id = a[0]
-                    album_id = a[1]
-                    albums.append(Album(owner_id, album_id))
-                return albums
-        return False
-
-    def is_photo_posted_by_hash(self, _hash):
-        with self._connection.cursor() as cursor:
-            sql = "SELECT `tg_post_id`,`date` FROM `goods` WHERE `hash`=%s and tg_channel=%s ORDER BY date DESC"
-            cursor.execute(sql, (_hash, self._channel))
-            result = cursor.fetchone()
-            if result:
-                return {
-                    'date': result[1],
-                    'tg_post_id': result[0]
-                }
         return False
 
     def insert_product(self, _product):
@@ -86,7 +119,18 @@ class Barahl0botDatabase:
         comments = _product.get_comments_text()
 
         with self._connection.cursor() as cursor:
-            sql = 'INSERT INTO `goods` VALUES(%s, %s, %s, %s, %s, NOW(), %s, %s, %s);'
+            sql = 'INSERT INTO goods (' \
+                  'vk_photo_id, ' \
+                  'photo_link,' \
+                  'seller_id,' \
+                  'descr,' \
+                  'tg_post_id,' \
+                  'date,' \
+                  'hash,' \
+                  'tg_channel,' \
+                  'comments) ' \
+                  'VALUES(%s, %s, %s, %s, %s, NOW(), %s, %s, %s);'
+
             cursor.execute(sql, (
                 vk_photo_id, photo_link, seller_id, descr, tg_post_id, photo_hash, self._channel, comments))
 
@@ -105,4 +149,7 @@ class Barahl0botDatabase:
             print(sql)
             cursor.execute(sql)
         self._connection.commit()
+
+    def get_connection(self):
+        return self._connection
 
