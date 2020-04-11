@@ -1,7 +1,9 @@
+import util
 import re
-
-from util import bot_util
-
+from database import Barahl0botDatabase
+from settings import Barahl0botSettings
+from vkontakte import VkontakteInfoGetter
+from structures import Album
 from telegram.ext import Updater, CommandHandler, ConversationHandler, Handler, MessageHandler, Filters
 import telegram.ext
 from enum import Enum
@@ -9,10 +11,13 @@ from enum import Enum
 
 __author__ = 'fut33v'
 
-DATA_DIRNAME = "data/"
-ALBUMS_FILENAME = DATA_DIRNAME + 'albums'
+_SETTINGS = Barahl0botSettings('settings.json')
+_TOKEN_TELEGRAM = _SETTINGS.token_telegram
+_CHANNEL = _SETTINGS.channel
+_DATABASE = Barahl0botDatabase(_CHANNEL)
+_VK_INFO_GETTER = VkontakteInfoGetter(_SETTINGS.token_vk)
 
-REGEXP_ALBUM = re.compile("http[s]?://vk.com/album(-?\d*_\d*)")
+REGEXP_ALBUM = re.compile("http[s]?://vk.com/album(-?\d*)_(\d*)")
 
 
 def start_handler(update, context):
@@ -21,7 +26,7 @@ def start_handler(update, context):
     С помощью этого бота можно: 
     
     + добавить объявление на канал *@barahlochannel*, 
-    + узнать список альбомов источников канала. 
+    + узнать список альбомов-источников канала. 
 
     *Github:* https://github.com/fut33v/barahl0bot
 
@@ -33,12 +38,12 @@ def start_handler(update, context):
 
 
 def get_albums_handler(update, context):
-    response = "Сегодня без альбомов, братан"
-    albums = bot_util.read_lines(ALBUMS_FILENAME)
+    response = "Сегодня без альбомов, братан."
+    albums = _DATABASE.get_albums_list()
     if albums:
         response = ""
         for a in albums:
-            response += "https://vk.com/album" + a
+            response += a.build_url() + "\n"
 
     context.bot.send_message(update.effective_chat.id, response)
 
@@ -50,16 +55,18 @@ def add_album_handler(update, context):
         print(album_candidate)
         m = REGEXP_ALBUM.match(album_candidate)
         if m:
-            album = m.group(1)
-            if bot_util.check_file_for_string(ALBUMS_FILENAME, album + "\n"):
-                open(ALBUMS_FILENAME, 'a').write(album + "\n")
-                response = "Альбом добавлен."
-            else:
+            album = Album(m.group(1), m.group(2))
+            if _DATABASE.is_album_in_table(album):
                 response = "Не, такой альбом ({}) есть уже.".format(album_candidate)
+            else:
+                # add album
+                _VK_INFO_GETTER.update_album_info(album)
+                _DATABASE.insert_album(album)
+                response = "Альбом <b>{}</b> добавлен.".format(album.title)
         else:
-            response = "Не удалось распарсить ссылку ({})".format(album_candidate)
+            response = "Не удалось распарсить ссылку <s>({})</s>".format(album_candidate)
 
-        context.bot.send_message(update.effective_chat.id, response)
+        context.bot.send_message(update.effective_chat.id, response, parse_mode=telegram.ParseMode.HTML)
 
 
 def remove_album_handler(update, context):
@@ -69,22 +76,16 @@ def remove_album_handler(update, context):
         print(album_candidate)
         m = REGEXP_ALBUM.match(album_candidate)
         if m:
-            album = m.group(1)
-            if bot_util.check_file_for_string(ALBUMS_FILENAME, album + "\n"):
+            album = Album(m.group(1), m.group(2))
+            if not _DATABASE.is_album_in_table(album):
                 response = "Такого альбома найдено не было."
             else:
-                temp = []
-                with open(ALBUMS_FILENAME) as fp:
-                    temp = fp.read().split("\n")
-                    temp = [x for x in temp if x != str(album) and x != ""]
-                with open(ALBUMS_FILENAME, 'w') as fp:
-                    for item in temp:
-                        fp.write("%s\n" % item)
+                _DATABASE.delete_album(album)
                 response = "Удалил."
         else:
-            response = "Не удалось распарсить ссылку ({})".format(album_candidate)
+            response = "Не удалось распарсить ссылку <s>({}</s>)".format(album_candidate)
 
-        context.bot.send_message(update.effective_chat.id, response)
+        context.bot.send_message(update.effective_chat.id, response, parse_mode=telegram.ParseMode.HTML)
 
 
 class UserState(Enum):
@@ -134,8 +135,7 @@ def add_item_process_text(update, context):
 def add_item_process_approve(update, context):
     description = ACTIVE_USERS[update.effective_user]["description"]
     photo_message = ACTIVE_USERS[update.effective_user]["photo"]
-    for channel in CHANNELS:
-        context.bot.send_photo(chat_id=channel, photo=photo_message.photo[-1].file_id, caption=description[:1024])
+    context.bot.send_photo(chat_id='@'+_CHANNEL, photo=photo_message.photo[-1].file_id, caption=description[:1024])
 
     message = "Товар размещен в барахолке."
     context.bot.send_message(update.effective_chat.id, message)
@@ -148,7 +148,7 @@ def cancel_handler(update, context):
 
 
 if __name__ == "__main__":
-    updater = Updater(TOKEN, use_context=True)
+    updater = Updater(_TOKEN_TELEGRAM, use_context=True)
     dispatcher = updater.dispatcher
 
     dispatcher.add_handler(CommandHandler('start', start_handler))
@@ -165,8 +165,7 @@ if __name__ == "__main__":
                                     callback=add_item_process_text, filters=Filters.text)],
                                 UserState.WAITING_FOR_APPROVE: [CommandHandler('done', add_item_process_approve)]
                             },
-                            fallbacks=[CommandHandler('cancel', cancel_handler)],
-        )
+                            fallbacks=[CommandHandler('cancel', cancel_handler)],)
     )
 
     updater.start_polling()

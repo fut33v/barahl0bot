@@ -83,7 +83,7 @@ def get_products_from_album(_album):
 
     new_products_list = list()
 
-    _album.album_name = response['album_name']
+    _album.title = response['album_name']
     _album.group_name = response['group_name']
 
     photos = response['photos']

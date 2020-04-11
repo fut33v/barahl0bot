@@ -14,8 +14,11 @@ class Album:
         self.owner_id = _owner_id
         self.album_id = _album_id
 
+        self.title = None
+        self.description = None
+        self.photo = None
+
         self.group_name = None
-        self.album_name = None
 
     def build_url(self):
         return "https://vk.com/album{}_{}".format(self.owner_id, self.album_id)
@@ -109,7 +112,7 @@ class Product:
         owner_id = self.album.owner_id
         # seller_id = self.seller.vk_id
         group_name = self.album.group_name
-        album_name = self.album.album_name
+        album_name = self.album.title
         seller = self.seller
 
         latest_product = "" + photo_url + "\n"
