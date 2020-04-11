@@ -1,4 +1,4 @@
-from util import bot_util
+import util
 
 import pymysql
 import glob
@@ -13,17 +13,19 @@ def sellers_to_mysql(sellers):
     cur.execute("SET NAMES utf8mb4")
 
     for s in sellers:
-        city = ""
+        city_id = 0
         if 'city' in s:
-            city = s['city']['title']
-        full_name = s['first_name'] + " " + s['last_name']
+            city_id = s['city']['id']
+        first_name = s['first_name']
+        last_name = s['last_name']
         photo = ""
         if 'photo_200' in s:
             photo = s['photo_200']
         vk_id = int(s['id'])
 
         try:
-            sql = 'INSERT INTO sellers VALUES({}, "{}", "{}", "{}");'.format(vk_id, full_name, city, photo)
+            sql = 'INSERT INTO sellers VALUES({}, "{}", "{}", {}, "{}");'.\
+                format(vk_id, first_name, last_name, city_id, photo)
             print(sql)
             cur.execute(sql)
             print("The query affected {} rows".format(cur.rowcount))
@@ -44,11 +46,17 @@ if __name__ == "__main__":
     dir_name = sys.argv[1]
     tg_channel = sys.argv[2]
 
+    sellers_filename = os.path.join(dir_name, "sellers.json")
+    sellers = util.load_json_file(sellers_filename)
+    sellers_to_mysql(sellers)
+
+    exit(0)
+
     messages = glob.glob(os.path.join(dir_name, "messages*hash.json"))
 
     for messages_json_filename in messages:
         print(messages_json_filename)
-        goods = bot_util.load_json_file(messages_json_filename)
+        goods = util.load_json_file(messages_json_filename)
         for g in goods:
             if len(g['seller']) <= 17:
                 continue
@@ -61,7 +69,7 @@ if __name__ == "__main__":
             photo_link_jpg = g['photo_link']
 
             tg_post_id = g['message_id']
-            date = bot_util.tg_date_to_mysql(g['date'])
+            date = util.tg_date_to_mysql(g['date'])
 
             photo_hash = g['hash']
 
@@ -78,10 +86,6 @@ if __name__ == "__main__":
                 print("The query affected {} rows".format(cur.rowcount))
             except pymysql.err.IntegrityError as e:
                 print(e)
-
-    sellers_filename = os.path.join(dir_name, "sellers.json")
-    sellers = bot_util.load_json_file(sellers_filename)
-    sellers_to_mysql(sellers)
 
     connection.commit()
 

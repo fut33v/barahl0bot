@@ -1,14 +1,16 @@
-from util import bot_util
+import util
 import sys
 import pymysql
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
+    if len(sys.argv) != 3:
+        print("album_filename channel_name")
         exit(-1)
 
     albums_file_name = sys.argv[1]
-    albums_lines = bot_util.read_lines(albums_file_name)
+    channel = sys.argv[2]
+    albums_lines = util.read_lines(albums_file_name)
 
     ow_al_id_list = []
     for a in albums_lines:
@@ -28,8 +30,10 @@ if __name__ == "__main__":
         print(owner_id, album_id)
 
         with connection.cursor() as cursor:
-            sql = 'INSERT INTO `albums` VALUES(%s, %s);'
-            cursor.execute(sql, (owner_id, album_id))
+            # sql = 'INSERT INTO `albums` VALUES(%s, %s);'
+            sql = 'INSERT INTO {}_albums VALUES({}, {})'.format(channel, owner_id, album_id)
+            print(sql)
+            cursor.execute(sql)
 
         connection.commit()
 
