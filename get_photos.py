@@ -3,6 +3,7 @@ import logging
 import datetime
 import os
 import traceback
+import sys
 
 import vk_api
 import telegram.ext
@@ -14,32 +15,9 @@ from structures import Album, Photo, Seller, Product
 import util
 
 
-_SETTINGS = Barahl0botSettings('settings.json')
-
-_TOKEN_TELEGRAM = _SETTINGS.token_telegram
-_CHANNEL = _SETTINGS.channel
-_ERROR_CHANNEL = _SETTINGS.error_channel
-
-_SECONDS_TO_SLEEP = _SETTINGS.seconds_to_sleep
-_SECONDS_TO_SLEEP_BETWEEN_ALBUMS = 1
-
-_TIMEOUT_FOR_PHOTO_SECONDS = 180
-if _SETTINGS.timeout_for_photo_seconds:
-    _TIMEOUT_FOR_PHOTO_SECONDS = _SETTINGS.timeout_for_photo_seconds
-
-_TOO_OLD_FOR_PHOTO_SECONDS = 24*60*60
-if _SETTINGS.too_old_for_photo_seconds:
-    _TOO_OLD_FOR_PHOTO_SECONDS = _SETTINGS.too_old_for_photo_seconds
-
 
 _OWNER_ID_POST_BY_GROUP_ADMIN = 100
 _LAST_ITEMS_COUNT = 20
-
-
-_DATABASE = Barahl0botDatabase(_CHANNEL)
-
-_VK_SESSION = vk_api.VkApi(token=_SETTINGS.token_vk)
-_VK_API = _VK_SESSION.get_api()
 
 _LOGGER = logging.getLogger("barahl0bot")
 _LOGS_DIR = 'log'
@@ -274,6 +252,32 @@ def main_loop():
 
 
 if __name__ == "__main__":
+    if len(sys.argv) != 2:
+        print("give me json with settings as argument!")
+        exit(-1)
+
+    settings_filename = sys.argv[1]
+    _SETTINGS = Barahl0botSettings(settings_filename)
+
+    _TOKEN_TELEGRAM = _SETTINGS.token_telegram
+    _CHANNEL = _SETTINGS.channel
+    _ERROR_CHANNEL = _SETTINGS.error_channel
+
+    _SECONDS_TO_SLEEP = _SETTINGS.seconds_to_sleep
+    _SECONDS_TO_SLEEP_BETWEEN_ALBUMS = 1
+
+    _TIMEOUT_FOR_PHOTO_SECONDS = 180
+    if _SETTINGS.timeout_for_photo_seconds:
+        _TIMEOUT_FOR_PHOTO_SECONDS = _SETTINGS.timeout_for_photo_seconds
+
+    _TOO_OLD_FOR_PHOTO_SECONDS = 24 * 60 * 60
+    if _SETTINGS.too_old_for_photo_seconds:
+        _TOO_OLD_FOR_PHOTO_SECONDS = _SETTINGS.too_old_for_photo_seconds
+
+    _DATABASE = Barahl0botDatabase(_CHANNEL)
+
+    _VK_SESSION = vk_api.VkApi(token=_SETTINGS.token_vk)
+    _VK_API = _VK_SESSION.get_api()
 
     try:
         if not os.path.exists(_LOGS_DIR):
