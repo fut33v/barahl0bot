@@ -12,6 +12,7 @@ import telegram.error
 
 from settings import Barahl0botSettings
 from database import Barahl0botDatabase
+from vkontakte import VkErrorCodesEnum
 from structures import Album, Photo, Seller, Product
 import util
 
@@ -51,6 +52,10 @@ def post_to_error_channel(message):
     if not _ERROR_CHANNEL:
         _LOGGER.error("Error channel not set...")
         return
+
+    _LOGGER.info("sleep before send error to telegram...")
+    time.sleep(3)
+
     bot = telegram.Bot(token=_TOKEN_TELEGRAM)
     message = "{}\n<code>{}</code>".format(_CHANNEL, html.escape(message))
     return bot.send_message('@' + _ERROR_CHANNEL, message, parse_mode=telegram.ParseMode.HTML)
@@ -64,8 +69,24 @@ class TelegramErrorHandler(logging.Handler):
 
 def get_products_from_album(_album):
 
-    response = _VK_API.execute.getPhotosX(album_id=_album.album_id, owner_id=_album.owner_id)
+    # response = _VK_API.execute.getPhotosX(album_id=_album.album_id, owner_id=_album.owner_id)
 
+    response = _VK_SESSION.method(
+        "execute.getPhotosX", values={'album_id': _album.album_id, 'owner_id': _album.owner_id}, raw=True)
+
+    if 'execute_errors' in response:
+        execute_errors = response['execute_errors']
+        limit_reached = False
+        for err in execute_errors:
+            if err['error_code'] == VkErrorCodesEnum.LIMIT_REACHED:
+                limit_reached = True
+        if limit_reached:
+            to_sleep = 60 * 60 * 2
+            _LOGGER.error("Limit reached, sleep for {} seconds".format(to_sleep))
+            time.sleep(to_sleep)
+            return None
+
+    response = response['response']
     new_products_list = list()
 
     _album.title = response['album_name']
@@ -206,32 +227,35 @@ def post_telegram(_product):
 def process_album(_album):
     products = get_products_from_album(_album)
 
-    if products:
-        _LOGGER.info("{} New goods:".format(len(products)))
+    if not products:
+        return
 
-        for p in products:
-            _LOGGER.info(p.photo.build_url())
+    photos_links = [p.photo.build_url() for p in products]
+    _LOGGER.info("{} New products: {}".format(len(products), str(photos_links).strip('[]')))
 
-        now = datetime.datetime.now()
-        for p in products:
-            # if duplicate but was more than week ago then post
-            if p.is_duplicate:
-                prev_tg_date = p.prev_tg_date
-                if not prev_tg_date:
-                    continue
-                diff = now - prev_tg_date
-                if diff.days < 7:
-                    continue
-            sent = post_telegram(p)
-            if sent:
-                tg_post_id = sent['message_id']
-                p.tg_post_id = tg_post_id
-                _DATABASE.insert_product(p)
+    now = datetime.datetime.now()
+    for p in products:
+        # if duplicate but was more than week ago then post
+        if p.is_duplicate:
+            prev_tg_date = p.prev_tg_date
+            if not prev_tg_date:
+                _LOGGER.info("Can't find prev date for product: {}".format(p.photo.build_url()))
+                continue
+            diff = now - prev_tg_date
+            if diff.days < 7:
+                _LOGGER.info("Less than a week for product: {}".format(p.photo.build_url()))
+                continue
+        sent = post_telegram(p)
+        if sent:
+            tg_post_id = sent['message_id']
+            p.tg_post_id = tg_post_id
+            _DATABASE.insert_product(p)
+            _LOGGER.info("Posted/saved: https://t.me/{}/{} {} ".format(_CHANNEL, tg_post_id, p.photo.build_url()))
 
-            # if too many new goods lets sleep between message send for
-            # telegram to be chill
-            if len(products) > 3:
-                time.sleep(5)
+        # if too many new goods lets sleep between message send for
+        # telegram to be chill
+        if len(products) > 3:
+            time.sleep(5)
 
 
 def main_loop():
@@ -246,16 +270,14 @@ def main_loop():
 
         albums = _DATABASE.get_albums_list()
         for a in albums:
-            _LOGGER.info("Getting photos from album: {}".format(a.build_url()))
+            _LOGGER.info("Processing album: {}".format(a.build_url()))
             process_album(a)
-            _LOGGER.info("Sleep for {} seconds before next album".format(_SECONDS_TO_SLEEP_BETWEEN_ALBUMS))
             time.sleep(_SECONDS_TO_SLEEP_BETWEEN_ALBUMS)
 
         previous_day = datetime.datetime.now().day
 
         _LOGGER.info("Sleep for {} seconds".format(_SECONDS_TO_SLEEP))
         time.sleep(_SECONDS_TO_SLEEP)
-        _LOGGER.info("Tick")
 
 
 if __name__ == "__main__":

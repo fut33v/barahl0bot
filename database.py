@@ -11,6 +11,7 @@ class Barahl0botDatabase:
                                            charset='utf8mb4')
         self._channel = _channel
         self._albums_table = self._channel + "_albums"
+        self._goods_table = self._channel + "_goods"
         return
 
     def get_albums_list(self):
@@ -31,7 +32,6 @@ class Barahl0botDatabase:
         with self._connection.cursor() as cursor:
             sql = "SELECT * FROM {t} WHERE owner_id = %s AND album_id = %s;". \
                 format(t=self._albums_table)
-            #, oi=album.owner_id, ai=album.album_id)
             cursor.execute(sql, (album.owner_id, album.album_id))
             result = cursor.fetchone()
             return result
@@ -63,8 +63,8 @@ class Barahl0botDatabase:
 
     def is_photo_posted_by_hash(self, _hash):
         with self._connection.cursor() as cursor:
-            sql = "SELECT `tg_post_id`,`date` FROM `goods` WHERE `hash`=%s AND tg_channel=%s ORDER BY date DESC"
-            cursor.execute(sql, (_hash, self._channel))
+            sql = "SELECT `tg_post_id`,`date` FROM {t} WHERE `hash`=%s ORDER BY date DESC".format(t=self._goods_table)
+            cursor.execute(sql, (_hash, ))
             result = cursor.fetchone()
             if result:
                 return {
@@ -78,18 +78,23 @@ class Barahl0botDatabase:
 
         with self._connection.cursor() as cursor:
             # Read a single record
-            sql = "SELECT * FROM `goods` WHERE `vk_photo_id`=%s and tg_channel=%s"
-            cursor.execute(sql, (photo_id_str, self._channel))
+            sql = "SELECT " \
+                  "seller_id," \
+                  "descr," \
+                  "tg_post_id," \
+                  "hash," \
+                  "comments" \
+                  " FROM {t} WHERE `vk_photo_id`=%s".format(t=self._goods_table)
+            cursor.execute(sql, (photo_id_str,))
             result = cursor.fetchone()
             if result:
                 seller = Seller()
-                seller.vk_id = result[2]
-                photo_hash = result[6]
+                seller.vk_id = result[0]
 
-                product = Product(seller=seller, photo_hash=photo_hash)
-                product.descr = result[3]
-                product.comments_text = result[8]
-                product.tg_post_id = result[4]
+                product = Product(seller=seller, photo_hash=result[3])
+                product.descr = result[1]
+                product.tg_post_id = result[2]
+                product.comments_text = result[4]
 
                 return product
 
@@ -119,7 +124,7 @@ class Barahl0botDatabase:
         comments = _product.get_comments_text()
 
         with self._connection.cursor() as cursor:
-            sql = 'INSERT INTO goods (' \
+            sql = 'INSERT INTO {t} (' \
                   'vk_photo_id, ' \
                   'photo_link,' \
                   'seller_id,' \
@@ -127,12 +132,11 @@ class Barahl0botDatabase:
                   'tg_post_id,' \
                   'date,' \
                   'hash,' \
-                  'tg_channel,' \
                   'comments) ' \
-                  'VALUES(%s, %s, %s, %s, %s, NOW(), %s, %s, %s);'
+                  'VALUES(%s, %s, %s, %s, %s, NOW(), %s, %s);'.format(t=self._goods_table)
 
             cursor.execute(sql, (
-                vk_photo_id, photo_link, seller_id, descr, tg_post_id, photo_hash, self._channel, comments))
+                vk_photo_id, photo_link, seller_id, descr, tg_post_id, photo_hash, comments))
 
         self._connection.commit()
 
@@ -144,10 +148,9 @@ class Barahl0botDatabase:
         text = product.get_description_text()
         comments = product.get_comments_text()
         with self._connection.cursor() as cursor:
-            sql = "UPDATE goods SET descr = '{text}', comments = '{comments}' WHERE vk_photo_id = '{vk_photo_id}';".\
-                format(vk_photo_id=vk_photo_id, text=text, comments=comments)
-            print(sql)
-            cursor.execute(sql)
+            sql = "UPDATE {t} SET descr = %s, comments = %s WHERE vk_photo_id = %s;".\
+                format(t=self._goods_table)
+            cursor.execute(sql, (text, comments, vk_photo_id))
         self._connection.commit()
 
     def get_connection(self):

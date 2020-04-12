@@ -1,4 +1,10 @@
 import vk_api
+from enum import IntEnum
+
+
+class VkErrorCodesEnum(IntEnum):
+    #: Достигнут количественный лимит на вызов метода
+    LIMIT_REACHED = 29
 
 
 def _get_widest_album_cover_photo_url(photo_sizes):
