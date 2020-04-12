@@ -15,7 +15,6 @@ from structures import Album, Photo, Seller, Product
 import util
 
 
-
 _OWNER_ID_POST_BY_GROUP_ADMIN = 100
 _LAST_ITEMS_COUNT = 20
 
@@ -52,7 +51,14 @@ def post_to_error_channel(message):
         _LOGGER.error("Error channel not set...")
         return
     bot = telegram.Bot(token=_TOKEN_TELEGRAM)
+    message = "{}  ```{}```".format(_CHANNEL, message)
     return bot.send_message('@' + _ERROR_CHANNEL, message, parse_mode=telegram.ParseMode.MARKDOWN)
+
+
+class TelegramErrorHandler(logging.Handler):
+    def emit(self, record: logging.LogRecord) -> None:
+        msg = self.format(record)
+        post_to_error_channel(msg)
 
 
 def get_products_from_album(_album):
@@ -239,6 +245,7 @@ def main_loop():
 
         albums = _DATABASE.get_albums_list()
         for a in albums:
+            a.owner_id = a.owner_id+2
             _LOGGER.info("Getting photos from album: {}".format(a.build_url()))
             process_album(a)
             _LOGGER.info("Sleep for {} seconds before next album".format(_SECONDS_TO_SLEEP_BETWEEN_ALBUMS))
@@ -283,23 +290,25 @@ if __name__ == "__main__":
         if not os.path.exists(_LOGS_DIR):
             os.mkdir(_LOGS_DIR)
 
+        # logging.getLogger().setLevel(logging.ERROR)
         logging.basicConfig(format='%(levelname)s %(asctime)s %(message)s', datefmt='%d/%m/%Y %H:%M:%S ')
-        logging.getLogger().setLevel(logging.ERROR)
-
         _LOGGER.setLevel(logging.DEBUG)
         formatter = logging.Formatter('%(levelname)s %(asctime)s %(message)s')
 
         set_logger_handlers()
+        tg_handler_error = TelegramErrorHandler()
+        tg_handler_error.setLevel(logging.ERROR)
+        tg_handler_error.setFormatter(formatter)
+        _LOGGER.addHandler(tg_handler_error)
 
         main_loop()
 
     except Exception as e:
         tb_ex = traceback.extract_tb(e.__traceback__)
 
-        error_message = "```"
+        error_message = ""
         for f in tb_ex:
             error_message += " {}:{}\n    {}".format(f.filename, f.lineno, f.line)
-        error_message += "```"
 
         post_to_error_channel(error_message)
 
