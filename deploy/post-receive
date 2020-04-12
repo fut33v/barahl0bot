@@ -1,6 +1,0 @@
-#!/bin/sh
-cd ..
-cp deploy/post-receive .git/hooks
-env -i git merge --ff-only master
-kill $(ps aux | grep 'python novgorod_weather_bot.py' | awk '{print $2}')
-screen -d -m python novgorod_weather_bot.py
