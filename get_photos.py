@@ -171,7 +171,7 @@ def set_logger_handlers():
     now = datetime.datetime.now()
     now = now.strftime("%d_%m_%Y")
 
-    log_filename = _LOGS_DIR + "/{}_debug.log".format(now)
+    log_filename = _LOGS_DIR + "/{}_{}_debug.log".format(_CHANNEL, now)
     fh_debug = logging.FileHandler(log_filename)
     fh_debug.setLevel(logging.DEBUG)
     fh_debug.setFormatter(formatter)
@@ -179,7 +179,7 @@ def set_logger_handlers():
     global _FH_DEBUG
     _FH_DEBUG = fh_debug
 
-    log_filename = _LOGS_DIR + "/{}_error.log".format(now)
+    log_filename = _LOGS_DIR + "/{}_{}_error.log".format(_CHANNEL, now)
     fh_error = logging.FileHandler(log_filename)
     fh_error.setLevel(logging.ERROR)
     fh_error.setFormatter(formatter)
