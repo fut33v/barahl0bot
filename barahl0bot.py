@@ -1,21 +1,18 @@
-import util
 import re
+import sys
+from enum import Enum
+
 from database import Barahl0botDatabase
 from settings import Barahl0botSettings
 from vkontakte import VkontakteInfoGetter
 from structures import Album
+
 from telegram.ext import Updater, CommandHandler, ConversationHandler, Handler, MessageHandler, Filters
 import telegram.ext
-from enum import Enum
 
 
 __author__ = 'fut33v'
 
-_SETTINGS = Barahl0botSettings('settings.json')
-_TOKEN_TELEGRAM = _SETTINGS.token_telegram
-_CHANNEL = _SETTINGS.channel
-_DATABASE = Barahl0botDatabase(_CHANNEL)
-_VK_INFO_GETTER = VkontakteInfoGetter(_SETTINGS.token_vk)
 
 REGEXP_ALBUM = re.compile("http[s]?://vk.com/album(-?\d*)_(\d*)")
 
@@ -148,6 +145,17 @@ def cancel_handler(update, context):
 
 
 if __name__ == "__main__":
+    if len(sys.argv) != 2:
+        print("give me json with settings as argument!")
+        exit(-1)
+
+    settings_filename = sys.argv[1]
+    _SETTINGS = Barahl0botSettings(settings_filename)
+    _TOKEN_TELEGRAM = _SETTINGS.token_telegram
+    _CHANNEL = _SETTINGS.channel
+    _DATABASE = Barahl0botDatabase(_CHANNEL)
+    _VK_INFO_GETTER = VkontakteInfoGetter(_SETTINGS.token_vk)
+
     updater = Updater(_TOKEN_TELEGRAM, use_context=True)
     dispatcher = updater.dispatcher
 
