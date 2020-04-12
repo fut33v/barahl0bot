@@ -4,6 +4,7 @@ import datetime
 import os
 import traceback
 import sys
+import html
 
 import vk_api
 import telegram.ext
@@ -51,8 +52,8 @@ def post_to_error_channel(message):
         _LOGGER.error("Error channel not set...")
         return
     bot = telegram.Bot(token=_TOKEN_TELEGRAM)
-    message = "{}  ```{}```".format(_CHANNEL, message)
-    return bot.send_message('@' + _ERROR_CHANNEL, message, parse_mode=telegram.ParseMode.MARKDOWN)
+    message = "{}\n<code>{}</code>".format(_CHANNEL, html.escape(message))
+    return bot.send_message('@' + _ERROR_CHANNEL, message, parse_mode=telegram.ParseMode.HTML)
 
 
 class TelegramErrorHandler(logging.Handler):
@@ -245,7 +246,6 @@ def main_loop():
 
         albums = _DATABASE.get_albums_list()
         for a in albums:
-            a.owner_id = a.owner_id
             _LOGGER.info("Getting photos from album: {}".format(a.build_url()))
             process_album(a)
             _LOGGER.info("Sleep for {} seconds before next album".format(_SECONDS_TO_SLEEP_BETWEEN_ALBUMS))
