@@ -1,10 +1,8 @@
 {
   "token_telegram": "" ,
   "token_vk": "",
-  "token_vk_wall": "",
-  "vk_club_id": -1,
-  "channels": ["@barahl0"],
-  "error_channel": "@barahlochannel_error",
+  "channel": "barahl0",
+  "error_channel": "barahlochannel_error",
   "admins": ["fut33v"],
   "seconds_to_sleep": 120,
   "timeout_for_photo_seconds" : 180,
