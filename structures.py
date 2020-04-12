@@ -1,7 +1,7 @@
 import logging
 import settings
 import html
-from util import make_numbers_bold
+from util import make_numbers_bold, get_unix_timestamp
 
 
 _LOGGER = logging.getLogger("barahl0bot")
@@ -199,4 +199,8 @@ class Photo:
 
     def get_photo_id_str(self):
         return str(self.owner_id) + "_" + str(self.photo_id)
+
+    def get_photo_age(self):
+        now_timestamp = get_unix_timestamp()
+        return now_timestamp - self.date
 

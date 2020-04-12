@@ -1,5 +1,6 @@
 import vk_api
 from enum import IntEnum
+from structures import Seller
 
 
 class VkErrorCodesEnum(IntEnum):
@@ -40,3 +41,7 @@ class VkontakteInfoGetter:
         album.title = album_info["title"]
         album.description = album_info["description"]
         album.photo = _get_widest_album_cover_photo_url(album_info["sizes"])
+
+    def get_seller(self, seller_id):
+        seller_info = self._vk_api.users.get(user_ids=seller_id, fields='city')[0]
+        return Seller(seller_info)

@@ -12,7 +12,7 @@ import telegram.error
 
 from settings import Barahl0botSettings
 from database import Barahl0botDatabase
-from vkontakte import VkErrorCodesEnum
+from vkontakte import VkErrorCodesEnum, VkontakteInfoGetter
 from structures import Album, Photo, Seller, Product
 import util
 
@@ -24,12 +24,6 @@ _LOGGER = logging.getLogger("barahl0bot")
 _LOGS_DIR = 'log'
 _FH_DEBUG = None
 _FH_ERROR = None
-
-
-def get_seller_from_vk(_seller_id):
-    seller_info = _VK_API.users.get(user_ids=_seller_id, fields='city')[0]
-    seller = Seller(seller_info)
-    return seller
 
 
 def post_to_channel_html(message, channel):
@@ -67,24 +61,57 @@ class TelegramErrorHandler(logging.Handler):
         post_to_error_channel(msg)
 
 
-def get_products_from_album(_album):
+def try_update_post_message(product, product_from_db):
+    seller = product_from_db.seller
+    # get seller from db, if not then add it (this code should be above
+    if not product_from_db.seller.is_club():
+        seller = _VK_INFO_GETTER.get_seller(product_from_db.seller.vk_id)
 
-    # response = _VK_API.execute.getPhotosX(album_id=_album.album_id, owner_id=_album.owner_id)
+    product.seller = seller
 
-    response = _VK_SESSION.method(
-        "execute.getPhotosX", values={'album_id': _album.album_id, 'owner_id': _album.owner_id}, raw=True)
+    same_comments = product.get_comments_text() == product_from_db.comments_text
+    same_text = product.get_description_text() == product_from_db.descr
 
+    if same_comments and same_text:
+        return
+
+    product.photo_hash = product_from_db.photo_hash
+    product.comments_text = product_from_db.comments_text
+
+    message_text = product.build_message_telegram(_CHANNEL)
+
+    # let's not bother telegram...
+    _LOGGER.debug("Sleep before telegram message edit")
+    time.sleep(3)
+
+    if edit_message_channel_html(message_id=product_from_db.tg_post_id, message_text=message_text, channel=_CHANNEL):
+        _LOGGER.info(
+            "Edited message https://t.me/{}/{} for photo {}".format(
+                _CHANNEL, product_from_db.tg_post_id, product.photo.build_url()))
+        _DATABASE.update_product_text_and_comments(product)
+        return
+    return
+
+
+def check_for_limit_reached(response):
     if 'execute_errors' in response:
         execute_errors = response['execute_errors']
         limit_reached = False
         for err in execute_errors:
             if err['error_code'] == VkErrorCodesEnum.LIMIT_REACHED:
                 limit_reached = True
-        if limit_reached:
-            to_sleep = 60 * 60 * 2
-            _LOGGER.error("Limit reached, sleep for {} seconds".format(to_sleep))
-            time.sleep(to_sleep)
-            return None
+        return limit_reached
+
+
+def get_products_from_album(_album):
+
+    response = _VK_SESSION.method(
+        "execute.getPhotosX", values={'album_id': _album.album_id, 'owner_id': _album.owner_id}, raw=True)
+
+    if check_for_limit_reached(response):
+        _LOGGER.error("Limit reached, sleep for {} seconds".format(_SETTINGS.seconds_to_sleep_limit_reached))
+        time.sleep(_SETTINGS.seconds_to_sleep_limit_reached)
+        return None
 
     response = response['response']
     new_products_list = list()
@@ -102,90 +129,53 @@ def get_products_from_album(_album):
     for vk_photo_dict in photos:
 
         photo = Photo(vk_photo_dict)
+        diff = photo.get_photo_age()
 
-        now_timestamp = util.get_unix_timestamp()
-        diff = now_timestamp - photo.date
+        if diff < _SETTINGS.timeout_for_photo_seconds or diff > _SETTINGS.too_old_for_photo_seconds:
+            continue
 
-        if _TIMEOUT_FOR_PHOTO_SECONDS < diff < _TOO_OLD_FOR_PHOTO_SECONDS:
+        comments_for_photo = [x for x in comments if x['photo_id'] == photo.photo_id][0]['comments']['items']
 
-            comments_for_photo = [x for x in comments if x['photo_id'] == photo.photo_id][0]['comments']['items']
+        product = Product(album=_album, photo=photo, comments=comments_for_photo)
 
-            product = Product(album=_album, photo=photo, comments=comments_for_photo)
+        # check photo_id in database, if so try to edit and skip
+        product_from_db = _DATABASE.is_photo_posted_by_id(photo)
+        if product_from_db:
+            try_update_post_message(product, product_from_db)
+            continue
 
-            # check photo_id in database
-            product_from_db = _DATABASE.is_photo_posted_by_id(photo)
-            if product_from_db:
-                # _LOGGER.debug("{} has been posted before".format(photo.build_url()))
+        is_duplicate = False
+        photo_hash = util.get_photo_hash(photo.get_widest_photo_url())
+        prev_by_hash = _DATABASE.is_photo_posted_by_hash(photo_hash)
+        prev_tg_post = None
+        prev_tg_date = None
+        if prev_by_hash:
+            # _LOGGER.debug("{} photo with exactly same hash has been posted before".format(photo.build_url()))
+            prev_tg_post = prev_by_hash['tg_post_id']
+            prev_tg_date = prev_by_hash['date']
+            is_duplicate = True
 
-                seller = product_from_db.seller
-                # get seller from db, if not then add it (this code should be above
-                if not product_from_db.seller.is_club():
-                    seller = get_seller_from_vk(product_from_db.seller.vk_id)
+        # if user album (id of owner is positive) and 'user_id' not in photo
+        if _album.owner_id > 0:
+            seller_id = _album.owner_id
+        else:
+            seller_id = vk_photo_dict['user_id']
 
-                product.seller = seller
+        seller = None
+        if seller_id != _OWNER_ID_POST_BY_GROUP_ADMIN:
+            time.sleep(1)
+            seller = _VK_INFO_GETTER.get_seller(seller_id)
+        else:
+            seller = Seller()
+            seller.vk_id = photo.owner_id
 
-                x1 = product.get_comments_text()
-                x2 = product_from_db.comments_text
-                same_comments = product.get_comments_text() == product_from_db.comments_text
-                same_text = product.get_description_text() == product_from_db.descr
+        product.seller = seller
+        product.photo_hash = photo_hash
+        product.is_duplicate = is_duplicate
+        product.prev_tg_date = prev_tg_date
+        product.prev_tg_post = prev_tg_post
 
-                if same_comments and same_text:
-                    continue
-
-                product.photo_hash = product_from_db.photo_hash
-                product.comments_text = product_from_db.comments_text
-
-                message_text = product.build_message_telegram(_CHANNEL)
-
-                # let's not bother telegram...
-                _LOGGER.debug("Sleep before telegram message edit")
-                time.sleep(3)
-
-                if edit_message_channel_html(message_id=product_from_db.tg_post_id, message_text=message_text, channel=_CHANNEL):
-                    _LOGGER.debug(
-                        "Edited message https://t.me/{}/{} for photo {}".format(
-                            _CHANNEL, product_from_db.tg_post_id, photo.build_url()))
-                    # TODO: update text and comments in database!!!
-                    _DATABASE.update_product_text_and_comments(product)
-                continue
-
-            is_duplicate = False
-            photo_hash = util.get_photo_hash(photo.get_widest_photo_url())
-            prev_by_hash = _DATABASE.is_photo_posted_by_hash(photo_hash)
-            prev_tg_post = None
-            prev_tg_date = None
-            if prev_by_hash:
-                # _LOGGER.debug("{} photo with exactly same hash has been posted before".format(photo.build_url()))
-                prev_tg_post = prev_by_hash['tg_post_id']
-                prev_tg_date = prev_by_hash['date']
-                is_duplicate = True
-
-            # if user album (id of owner is positive) and 'user_id' not in photo
-            if _album.owner_id > 0:
-                seller_id = _album.owner_id
-            else:
-                seller_id = vk_photo_dict['user_id']
-
-            seller = None
-            if seller_id != _OWNER_ID_POST_BY_GROUP_ADMIN:
-                time.sleep(1)
-                # get user info here
-                seller_info = _VK_API.users.get(user_ids=seller_id, fields='city')[0]
-                seller = Seller(seller_info)
-            else:
-                seller = Seller()
-                seller.vk_id = photo.owner_id
-
-            product.seller = seller
-            product.photo_hash = photo_hash
-            product.is_duplicate = is_duplicate
-            product.prev_tg_date = prev_tg_date
-            product.prev_tg_post = prev_tg_post
-
-            new_products_list.append(product)
-
-        # elif diff < _TIMEOUT_FOR_PHOTO_SECONDS:
-        #     _LOGGER.debug("{} too yong ({} seconds of life)".format(photo.build_url(), diff))
+        new_products_list.append(product)
 
     return new_products_list
 
@@ -225,6 +215,7 @@ def post_telegram(_product):
 
 
 def process_album(_album):
+
     products = get_products_from_album(_album)
 
     if not products:
@@ -242,8 +233,9 @@ def process_album(_album):
                 _LOGGER.info("Can't find prev date for product: {}".format(p.photo.build_url()))
                 continue
             diff = now - prev_tg_date
-            if diff.days < 7:
-                _LOGGER.info("Less than a week for product: {}".format(p.photo.build_url()))
+            if diff.days < _SETTINGS.days_timeout_for_product:
+                _LOGGER.info("Less than {} days for product: {}".
+                             format(_SETTINGS.days_timeout_for_product, p.photo.build_url()))
                 continue
         sent = post_telegram(p)
         if sent:
@@ -269,15 +261,16 @@ def main_loop():
             set_logger_handlers()
 
         albums = _DATABASE.get_albums_list()
+
         for a in albums:
             _LOGGER.info("Processing album: {}".format(a.build_url()))
             process_album(a)
-            time.sleep(_SECONDS_TO_SLEEP_BETWEEN_ALBUMS)
+            time.sleep(_SETTINGS.seconds_to_sleep_between_albums)
 
         previous_day = datetime.datetime.now().day
 
-        _LOGGER.info("Sleep for {} seconds".format(_SECONDS_TO_SLEEP))
-        time.sleep(_SECONDS_TO_SLEEP)
+        _LOGGER.info("Sleep for {} seconds".format(_SETTINGS.seconds_to_sleep))
+        time.sleep(_SETTINGS.seconds_to_sleep)
 
 
 if __name__ == "__main__":
@@ -292,27 +285,23 @@ if __name__ == "__main__":
     _CHANNEL = _SETTINGS.channel
     _ERROR_CHANNEL = _SETTINGS.error_channel
 
-    _SECONDS_TO_SLEEP = _SETTINGS.seconds_to_sleep
-    _SECONDS_TO_SLEEP_BETWEEN_ALBUMS = 1
-
-    _TIMEOUT_FOR_PHOTO_SECONDS = 180
-    if _SETTINGS.timeout_for_photo_seconds:
-        _TIMEOUT_FOR_PHOTO_SECONDS = _SETTINGS.timeout_for_photo_seconds
-
-    _TOO_OLD_FOR_PHOTO_SECONDS = 24 * 60 * 60
-    if _SETTINGS.too_old_for_photo_seconds:
-        _TOO_OLD_FOR_PHOTO_SECONDS = _SETTINGS.too_old_for_photo_seconds
+    # _SECONDS_TO_SLEEP = _SETTINGS.seconds_to_sleep
+    # _SECONDS_TO_SLEEP_BETWEEN_ALBUMS = 1
+    # _SECONDS_TO_SLEEP_LIMIT_REACHED = 60 * 60 * 2
+    #
+    # _TIMEOUT_FOR_PHOTO_SECONDS = _SETTINGS.timeout_for_photo_seconds
+    # _TOO_OLD_FOR_PHOTO_SECONDS = _SETTINGS.too_old_for_photo_seconds
 
     _DATABASE = Barahl0botDatabase(_CHANNEL)
 
     _VK_SESSION = vk_api.VkApi(token=_SETTINGS.token_vk)
-    _VK_API = _VK_SESSION.get_api()
+    _VK_INFO_GETTER = VkontakteInfoGetter(_SETTINGS.token_vk)
 
     try:
         if not os.path.exists(_LOGS_DIR):
             os.mkdir(_LOGS_DIR)
 
-        # logging.getLogger().setLevel(logging.ERROR)
+        logging.getLogger().setLevel(logging.ERROR)
         logging.basicConfig(format='%(levelname)s %(asctime)s %(message)s', datefmt='%d/%m/%Y %H:%M:%S ')
         _LOGGER.setLevel(logging.DEBUG)
         formatter = logging.Formatter('%(levelname)s %(asctime)s %(message)s')
