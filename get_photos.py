@@ -245,7 +245,7 @@ def main_loop():
 
         albums = _DATABASE.get_albums_list()
         for a in albums:
-            a.owner_id = a.owner_id+2
+            a.owner_id = a.owner_id
             _LOGGER.info("Getting photos from album: {}".format(a.build_url()))
             process_album(a)
             _LOGGER.info("Sleep for {} seconds before next album".format(_SECONDS_TO_SLEEP_BETWEEN_ALBUMS))
