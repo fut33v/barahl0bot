@@ -9,7 +9,7 @@ from structures import Album
 
 from telegram.ext import Updater, CommandHandler, ConversationHandler, Handler, MessageHandler, Filters
 import telegram.ext
-
+from vk_api.exceptions import ApiError
 
 __author__ = 'fut33v'
 
@@ -49,17 +49,18 @@ def add_album_handler(update, context):
     if len(context.args) == 0:
         return
     for album_candidate in context.args:
-        print(album_candidate)
         m = REGEXP_ALBUM.match(album_candidate)
         if m:
             album = Album(m.group(1), m.group(2))
             if _DATABASE.is_album_in_table(album):
                 response = "Не, такой альбом ({}) есть уже.".format(album_candidate)
             else:
-                # add album
-                _VK_INFO_GETTER.update_album_info(album)
-                _DATABASE.insert_album(album)
-                response = "Альбом <b>{}</b> добавлен.\n".format(album.title, album_candidate)
+                try:
+                    _VK_INFO_GETTER.update_album_info(album)
+                    _DATABASE.insert_album(album)
+                    response = "Альбом <b>{}</b> добавлен.\n".format(album.title, album_candidate)
+                except ApiError as e:
+                    response = "Код ошибки {}: {}".format(e.error['error_code'], e.error['error_msg'])
         else:
             response = "Не удалось распарсить ссылку <s>({})</s>".format(album_candidate)
 
