@@ -47,7 +47,7 @@ def post_to_error_channel(message):
         _LOGGER.error("Error channel not set...")
         return
 
-    _LOGGER.info("sleep before send error to telegram...")
+    _LOGGER.debug("Sleep before send error to telegram...")
     time.sleep(3)
 
     bot = telegram.Bot(token=_TOKEN_TELEGRAM)

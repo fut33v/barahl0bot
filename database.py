@@ -37,22 +37,22 @@ class Barahl0botDatabase:
             return result
 
     def insert_album(self, album):
-        try:
-            with self._connection.cursor() as cursor:
-                sql = 'INSERT INTO {t} (' \
-                      'owner_id, ' \
-                      'album_id,' \
-                      'title,' \
-                      'description,' \
-                      'photo) ' \
-                      'VALUES(%s, %s, %s, %s, %s);'.\
-                    format(t=self._albums_table)
+        # try:
+        with self._connection.cursor() as cursor:
+            sql = 'INSERT INTO {t} (' \
+                  'owner_id, ' \
+                  'album_id,' \
+                  'title,' \
+                  'description,' \
+                  'photo) ' \
+                  'VALUES(%s, %s, %s, %s, %s);'.\
+                format(t=self._albums_table)
 
-                cursor.execute(sql, (album.owner_id, album.album_id, album.title, album.description, album.photo))
+            cursor.execute(sql, (album.owner_id, album.album_id, album.title, album.description, album.photo))
 
-            self._connection.commit()
-        except pymysql.Error as e:
-            print(e)
+        self._connection.commit()
+        # except pymysql.Error as e:
+        #     print(e)
 
     def delete_album(self, album):
         with self._connection.cursor() as cursor:
@@ -73,9 +73,7 @@ class Barahl0botDatabase:
                 }
         return False
 
-    def is_photo_posted_by_id(self, _photo):
-        photo_id_str = _photo.get_photo_id_str()
-
+    def is_photo_posted_by_id(self, photo):
         with self._connection.cursor() as cursor:
             # Read a single record
             sql = "SELECT " \
@@ -84,8 +82,8 @@ class Barahl0botDatabase:
                   "tg_post_id," \
                   "hash," \
                   "comments" \
-                  " FROM {t} WHERE `vk_photo_id`=%s".format(t=self._goods_table)
-            cursor.execute(sql, (photo_id_str,))
+                  " FROM {t} WHERE `vk_owner_id`=%s AND `vk_photo_id`=%s".format(t=self._goods_table)
+            cursor.execute(sql, (photo.owner_id, photo.photo_id,))
             result = cursor.fetchone()
             if result:
                 seller = Seller()
@@ -105,17 +103,13 @@ class Barahl0botDatabase:
             _LOGGER.warning("Trying to add good without seller")
             return
 
-        # if _product.photo.owner_id < 0:
         # if seller is group/public/community
         if _product.seller.is_club():
             seller_id = _product.photo.owner_id
         else:
             seller_id = int(_product.seller.vk_id)
 
-        owner_id = str(_product.album.owner_id)
         photo = _product.photo
-        photo_id = str(photo.photo_id)
-        vk_photo_id = owner_id + "_" + photo_id
         tg_post_id = int(_product.tg_post_id)
         photo_link = photo.get_widest_photo_url()
         photo_hash = _product.photo_hash
@@ -125,6 +119,7 @@ class Barahl0botDatabase:
 
         with self._connection.cursor() as cursor:
             sql = 'INSERT INTO {t} (' \
+                  'vk_owner_id, ' \
                   'vk_photo_id, ' \
                   'photo_link,' \
                   'seller_id,' \
@@ -133,24 +128,21 @@ class Barahl0botDatabase:
                   'date,' \
                   'hash,' \
                   'comments) ' \
-                  'VALUES(%s, %s, %s, %s, %s, NOW(), %s, %s);'.format(t=self._goods_table)
+                  'VALUES(%s, %s, %s, %s, %s, %s, NOW(), %s, %s);'.format(t=self._goods_table)
 
             cursor.execute(sql, (
-                vk_photo_id, photo_link, seller_id, descr, tg_post_id, photo_hash, comments))
+                photo.owner_id, photo.photo_id, photo_link, seller_id, descr, tg_post_id, photo_hash, comments))
 
         self._connection.commit()
 
     def update_product_text_and_comments(self, product):
-        owner_id = str(product.album.owner_id)
         photo = product.photo
-        photo_id = str(photo.photo_id)
-        vk_photo_id = owner_id + "_" + photo_id
         text = product.get_description_text()
         comments = product.get_comments_text()
         with self._connection.cursor() as cursor:
-            sql = "UPDATE {t} SET descr = %s, comments = %s WHERE vk_photo_id = %s;".\
+            sql = "UPDATE {t} SET descr = %s, comments = %s WHERE vk_owner_id = %s AND vk_photo_id = %s;".\
                 format(t=self._goods_table)
-            cursor.execute(sql, (text, comments, vk_photo_id))
+            cursor.execute(sql, (text, comments, photo.owner_id, photo.photo_id))
         self._connection.commit()
 
     def get_connection(self):
