@@ -36,7 +36,6 @@ class VkontakteInfoGetter:
             return None
 
         album_info = album_info['items'][0]
-        print(album_info)
 
         album.title = album_info["title"]
         album.description = album_info["description"]
