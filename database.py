@@ -8,7 +8,7 @@ _LOGGER = logging.getLogger("barahl0bot")
 class Barahl0botDatabase:
     def __init__(self, _channel):
         self._connection = pymysql.connect(host='localhost', user='fut33v', password='', db='barahlochannel',
-                                           charset='utf8mb4')
+                                           charset='utf8mb4', autocommit=True)
         self._channel = _channel
         self._albums_table = self._channel + "_albums"
         self._goods_table = self._channel + "_goods"
