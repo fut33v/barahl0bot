@@ -42,7 +42,7 @@ def get_albums_handler(update, context):
         for a in albums:
             response += a.build_url() + "\n"
 
-    context.bot.send_message(update.effective_chat.id, response)
+    context.bot.send_message(update.effective_chat.id, response, disable_web_page_preview=True)
 
 
 def add_album_handler(update, context):
@@ -59,7 +59,7 @@ def add_album_handler(update, context):
                 # add album
                 _VK_INFO_GETTER.update_album_info(album)
                 _DATABASE.insert_album(album)
-                response = "Альбом <b>{}</b> добавлен.".format(album.title)
+                response = "Альбом <b>{}</b> добавлен.\n".format(album.title, album_candidate)
         else:
             response = "Не удалось распарсить ссылку <s>({})</s>".format(album_candidate)
 
@@ -78,7 +78,7 @@ def remove_album_handler(update, context):
                 response = "Такого альбома найдено не было."
             else:
                 _DATABASE.delete_album(album)
-                response = "Удалил."
+                response = "Удалил альбом\n{}".format(album_candidate)
         else:
             response = "Не удалось распарсить ссылку <s>({}</s>)".format(album_candidate)
 
