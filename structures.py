@@ -29,7 +29,10 @@ class Seller:
         self.vk_id = None
         self.first_name = None
         self.last_name = None
-        self.city = None
+        self.city_id = None
+        self.photo = None
+
+        self.city_title = None
 
         if users_get_result:
             if "id" in users_get_result:
@@ -40,12 +43,21 @@ class Seller:
                 self.last_name = users_get_result["last_name"]
             if "city" in users_get_result:
                 if "title" in users_get_result["city"]:
-                    self.city = users_get_result["city"]["title"]
+                    self.city_title = users_get_result["city"]["title"]
+                if "id" in users_get_result["city"]:
+                    self.city_id = users_get_result["city"]["id"]
+            if "photo_200" in users_get_result:
+                self.photo = users_get_result["photo_200"]
 
     def is_club(self):
         if self.vk_id < 0:
             return True
         return False
+
+    def build_url(self):
+        if self.is_club():
+            return "https://vk.com/public" + str(-self.vk_id)
+        return "https://vk.com/id" + str(self.vk_id)
 
 
 class Product:
@@ -142,8 +154,8 @@ class Product:
                 "<b>Продавец:</b> <a href=\"https://vk.com/id{}\">{} {}</a>".format(
                     seller.vk_id, seller.first_name, seller.last_name)
 
-            if seller.city:
-                latest_product += " ({})".format(seller.city)
+            if seller.city_title:
+                latest_product += " ({})".format(seller.city_title)
 
         latest_product += "\n"
 
@@ -204,3 +216,20 @@ class Photo:
         now_timestamp = get_unix_timestamp()
         return now_timestamp - self.date
 
+
+class Group:
+    def __init__(self, groups_get_by_id_result):
+        self.id = None
+        self.name = None
+        self.screen_name = None
+        self.photo = None
+
+        if groups_get_by_id_result:
+            if "id" in groups_get_by_id_result:
+                self.id = groups_get_by_id_result["id"]
+            if "name" in groups_get_by_id_result:
+                self.id = groups_get_by_id_result["name"]
+            if "screen_name" in groups_get_by_id_result:
+                self.id = groups_get_by_id_result["screen_name"]
+            if "photo_200" in groups_get_by_id_result:
+                self.photo = groups_get_by_id_result["photo_200"]

@@ -6,7 +6,8 @@ import traceback
 import sys
 import html
 
-import vk_api
+import vk_api.exceptions
+
 import telegram.ext
 import telegram.error
 
@@ -105,8 +106,7 @@ def check_for_limit_reached(response):
 
 def get_products_from_album(_album):
 
-    response = _VK_SESSION.method(
-        "execute.getPhotosX", values={'album_id': _album.album_id, 'owner_id': _album.owner_id}, raw=True)
+    response = _VK_INFO_GETTER.get_photos_x(_album)
 
     if check_for_limit_reached(response):
         _LOGGER.error("Limit reached, sleep for {} seconds".format(_SETTINGS.seconds_to_sleep_limit_reached))
@@ -150,7 +150,6 @@ def get_products_from_album(_album):
         prev_tg_post = None
         prev_tg_date = None
         if prev_by_hash:
-            # _LOGGER.debug("{} photo with exactly same hash has been posted before".format(photo.build_url()))
             prev_tg_post = prev_by_hash['tg_post_id']
             prev_tg_date = prev_by_hash['date']
             is_duplicate = True
@@ -161,10 +160,11 @@ def get_products_from_album(_album):
         else:
             seller_id = vk_photo_dict['user_id']
 
-        seller = None
         if seller_id != _OWNER_ID_POST_BY_GROUP_ADMIN:
-            time.sleep(1)
-            seller = _VK_INFO_GETTER.get_seller(seller_id)
+            seller = _DATABASE.is_seller_in_table_by_id(seller_id)
+            if not seller:
+                time.sleep(2)
+                seller = _VK_INFO_GETTER.get_seller(seller_id)
         else:
             seller = Seller()
             seller.vk_id = photo.owner_id
@@ -216,7 +216,13 @@ def post_telegram(_product):
 
 def process_album(_album):
 
-    products = get_products_from_album(_album)
+    products = None
+
+    try:
+        products = get_products_from_album(_album)
+    except vk_api.exceptions.ApiHttpError as api_http_error:
+        _LOGGER.error("HTTP Error while get products for album {}: {} ".format(api_http_error, _album.build_url()))
+        time.sleep(10)
 
     if not products:
         return
@@ -230,7 +236,7 @@ def process_album(_album):
         if p.is_duplicate:
             prev_tg_date = p.prev_tg_date
             if not prev_tg_date:
-                _LOGGER.info("Can't find prev date for product: {}".format(p.photo.build_url()))
+                _LOGGER.warning("Can't find prev date for product: {}".format(p.photo.build_url()))
                 continue
             diff = now - prev_tg_date
             if diff.days < _SETTINGS.days_timeout_for_product:
@@ -239,13 +245,20 @@ def process_album(_album):
                 continue
         sent = post_telegram(p)
         if sent:
-            tg_post_id = sent['message_id']
-            p.tg_post_id = tg_post_id
-            _DATABASE.insert_product(p)
-            _LOGGER.info("Posted/saved: https://t.me/{}/{} {} ".format(_CHANNEL, tg_post_id, p.photo.build_url()))
+            p.tg_post_id = sent['message_id']
 
-        # if too many new goods lets sleep between message send for
-        # telegram to be chill
+            if not p.seller.is_club():
+                # check for seller and insert him/her if not in table
+                if not _DATABASE.is_seller_in_table_by_id(p.seller.vk_id):
+                    _DATABASE.insert_seller(p.seller)
+                    _LOGGER.info("New seller saved: {} ".format(p.seller.build_url()))
+
+            # save product to database
+            _DATABASE.insert_product(p)
+
+            _LOGGER.info("Posted/saved: https://t.me/{}/{} {} ".format(_CHANNEL, p.tg_post_id, p.photo.build_url()))
+
+        # if too many new goods lets sleep between message send for telegram to be chill
         if len(products) > 3:
             time.sleep(5)
 
@@ -285,16 +298,8 @@ if __name__ == "__main__":
     _CHANNEL = _SETTINGS.channel
     _ERROR_CHANNEL = _SETTINGS.error_channel
 
-    # _SECONDS_TO_SLEEP = _SETTINGS.seconds_to_sleep
-    # _SECONDS_TO_SLEEP_BETWEEN_ALBUMS = 1
-    # _SECONDS_TO_SLEEP_LIMIT_REACHED = 60 * 60 * 2
-    #
-    # _TIMEOUT_FOR_PHOTO_SECONDS = _SETTINGS.timeout_for_photo_seconds
-    # _TOO_OLD_FOR_PHOTO_SECONDS = _SETTINGS.too_old_for_photo_seconds
-
     _DATABASE = Barahl0botDatabase(_CHANNEL)
 
-    _VK_SESSION = vk_api.VkApi(token=_SETTINGS.token_vk)
     _VK_INFO_GETTER = VkontakteInfoGetter(_SETTINGS.token_vk)
 
     try:

@@ -1,6 +1,6 @@
 import vk_api
 from enum import IntEnum
-from structures import Seller
+from structures import Seller, Group
 
 
 class VkErrorCodesEnum(IntEnum):
@@ -24,6 +24,10 @@ class VkontakteInfoGetter:
         self._vk_session = vk_api.VkApi(token=token)
         self._vk_api = self._vk_session.get_api()
 
+    def get_photos_x(self, album):
+        return self._vk_session.method(
+            "execute.getPhotosX", values={'album_id': album.album_id, 'owner_id': album.owner_id}, raw=True)
+
     def update_album_info(self, album):
         if not album.owner_id or not album.album_id:
             return None
@@ -42,5 +46,13 @@ class VkontakteInfoGetter:
         album.photo = _get_widest_album_cover_photo_url(album_info["sizes"])
 
     def get_seller(self, seller_id):
-        seller_info = self._vk_api.users.get(user_ids=seller_id, fields='city')[0]
+        seller_info = self._vk_api.users.get(user_ids=seller_id, fields='city,photo_200')[0]
         return Seller(seller_info)
+
+    def get_groups(self, group_ids):
+        response = self._vk_api.groups.getById(group_ids=group_ids, fields='photo_200')
+        groups = []
+        for g in response:
+            groups.append(Group(g))
+        return groups
+

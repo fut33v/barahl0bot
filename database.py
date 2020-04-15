@@ -6,12 +6,15 @@ _LOGGER = logging.getLogger("barahl0bot")
 
 
 class Barahl0botDatabase:
-    def __init__(self, _channel):
-        self._connection = pymysql.connect(host='localhost', user='fut33v', password='', db='barahlochannel',
+    def __init__(self, channel, database='barahlochannel'):
+        self._connection = pymysql.connect(host='localhost', user='fut33v', password='', db=database,
                                            charset='utf8mb4', autocommit=True)
-        self._channel = _channel
+        self._channel = channel
         self._albums_table = self._channel + "_albums"
         self._goods_table = self._channel + "_goods"
+        self._sellers_table = "sellers"
+        self._cities_table = "cities"
+        self._groups_table = "groups"
         return
 
     def get_albums_list(self):
@@ -37,7 +40,6 @@ class Barahl0botDatabase:
             return result
 
     def insert_album(self, album):
-        # try:
         with self._connection.cursor() as cursor:
             sql = 'INSERT INTO {t} (' \
                   'owner_id, ' \
@@ -51,15 +53,37 @@ class Barahl0botDatabase:
             cursor.execute(sql, (album.owner_id, album.album_id, album.title, album.description, album.photo))
 
         self._connection.commit()
-        # except pymysql.Error as e:
-        #     print(e)
 
     def delete_album(self, album):
         with self._connection.cursor() as cursor:
-            sql = 'DELETE FROM {t} WHERE owner_id=%s AND album_id=%s;'.format(t=self._albums_table)
+            sql = 'DELETE FROM {t} WHERE `owner_id`=%s AND `album_id`=%s;'.format(t=self._albums_table)
             result = cursor.execute(sql, (album.owner_id, album.album_id))
             self._connection.commit()
             return result
+
+    def is_group_in_table_by_id(self, group_id):
+        group_id = abs(group_id)
+        with self._connection.cursor() as cursor:
+            sql = "SELECT * FROM {t} WHERE `id`=%s".format(t=self._groups_table)
+            cursor.execute(sql, (group_id, ))
+            result = cursor.fetchone()
+            if result:
+                return True
+        return False
+
+    def insert_group(self, group):
+        with self._connection.cursor() as cursor:
+            # insert city if not in table
+            # insert seller
+            sql = 'INSERT INTO {t} (' \
+                  'id, ' \
+                  'name,' \
+                  'screen_name,' \
+                  'photo) ' \
+                  'VALUES(%s, %s, %s, %s, %s);'.format(t=self._groups_table)
+            cursor.execute(sql, (group.id, group.name, group.screen_name, group.photo))
+
+        self._connection.commit()
 
     def is_photo_posted_by_hash(self, _hash):
         with self._connection.cursor() as cursor:
@@ -82,7 +106,7 @@ class Barahl0botDatabase:
                   "tg_post_id," \
                   "hash," \
                   "comments" \
-                  " FROM {t} WHERE `vk_owner_id`=%s AND `vk_photo_id`=%s".format(t=self._goods_table)
+                  " FROM {t} WHERE `vk_owner_id`=%s AND `vk_photo_id`=%s AND `tg_post_id` IS NOT NULL".format(t=self._goods_table)
             cursor.execute(sql, (photo.owner_id, photo.photo_id,))
             result = cursor.fetchone()
             if result:
@@ -143,6 +167,60 @@ class Barahl0botDatabase:
             sql = "UPDATE {t} SET descr = %s, comments = %s WHERE vk_owner_id = %s AND vk_photo_id = %s;".\
                 format(t=self._goods_table)
             cursor.execute(sql, (text, comments, photo.owner_id, photo.photo_id))
+        self._connection.commit()
+
+    def get_city_title(self, city_id):
+        with self._connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            sql = "SELECT * FROM {t} WHERE `id`=%s".format(t=self._cities_table)
+            cursor.execute(sql, (city_id,))
+            result = cursor.fetchone()
+            if result:
+                return result["title"]
+        return False
+
+    def is_seller_in_table_by_id(self, seller_id):
+        with self._connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            sql = "SELECT * FROM {t} WHERE `vk_id`=%s".format(t=self._sellers_table)
+            cursor.execute(sql, (seller_id, ))
+            result = cursor.fetchone()
+            if result:
+                seller = Seller()
+                seller.city_id = result["city_id"]
+                if seller.city_id:
+                    seller.city_title = self.get_city_title(seller.city_id)
+
+                seller.vk_id = result["vk_id"]
+                seller.first_name = result["first_name"]
+                seller.last_name = result["last_name"]
+                seller.photo = result["photo"]
+                return seller
+        return False
+
+    def insert_seller(self, seller):
+        if seller.is_club():
+            return
+        with self._connection.cursor() as cursor:
+            if seller.city_id:
+                # insert city if not in table
+                sql = "SELECT * FROM {t} WHERE `id`=%s".format(t=self._cities_table)
+                cursor.execute(sql, (seller.city_id, ))
+                result = cursor.fetchone()
+                if not result:
+                    sql = 'INSERT INTO {t} (' \
+                          'id, ' \
+                          'title) ' \
+                          'VALUES(%s, %s);'.format(t=self._cities_table)
+                    cursor.execute(sql, (seller.city_id, seller.city_title))
+            # insert seller
+            sql = 'INSERT INTO {t} (' \
+                  'vk_id, ' \
+                  'first_name,' \
+                  'last_name,' \
+                  'city_id,' \
+                  'photo) ' \
+                  'VALUES(%s, %s, %s, %s, %s);'.format(t=self._sellers_table)
+            cursor.execute(sql, (seller.vk_id, seller.first_name, seller.last_name, seller.city_id, seller.photo))
+
         self._connection.commit()
 
     def get_connection(self):

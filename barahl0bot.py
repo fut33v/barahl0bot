@@ -5,7 +5,7 @@ from enum import Enum
 from database import Barahl0botDatabase
 from settings import Barahl0botSettings
 from vkontakte import VkontakteInfoGetter
-from structures import Album
+from structures import Album, Group
 
 from telegram.ext import Updater, CommandHandler, ConversationHandler, Handler, MessageHandler, Filters
 import telegram.ext
@@ -57,10 +57,18 @@ def add_album_handler(update, context):
             else:
                 try:
                     _VK_INFO_GETTER.update_album_info(album)
+                    # insert group in table if not exists
+                    if album.owner_id < 0:
+                        if not _DATABASE.is_group_in_table_by_id(album.owner_id):
+                            group = _VK_INFO_GETTER.get_groups([album.owner_id])
+                            if group:
+                                group = Group(group[0])
+                                _DATABASE.insert_group(group)
+                    # insert album
                     _DATABASE.insert_album(album)
                     response = "Альбом <b>{}</b> добавлен.\n".format(album.title, album_candidate)
                 except ApiError as e:
-                    response = "Код ошибки {}: {}".format(e.error['error_code'], e.error['error_msg'])
+                    response = "Код ошибки VK API {}: {}".format(e.error['error_code'], e.error['error_msg'])
         else:
             response = "Не удалось распарсить ссылку <s>({})</s>".format(album_candidate)
 
@@ -97,7 +105,7 @@ ACTIVE_USERS = {}
 
 
 def add_item_handler(update, context):
-    message = "Пришлите фото или альбом.\n\nИли нажмите /cancel для отмены."
+    message = "Пришлите фото (альбом пока не работает).\n\nИли нажмите /cancel для отмены."
     context.bot.send_message(update.effective_chat.id, message)
     return UserState.WAITING_FOR_PHOTO
 
