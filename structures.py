@@ -11,8 +11,8 @@ class Album:
     _ALBUM_ID_WALL = "wall"
 
     def __init__(self, _owner_id, _album_id):
-        self.owner_id = _owner_id
-        self.album_id = _album_id
+        self.owner_id = int(_owner_id)
+        self.album_id = int(_album_id)
 
         self.title = None
         self.description = None

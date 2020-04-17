@@ -1,5 +1,8 @@
+from os import path
 import re
 import sys
+import datetime
+import logging
 from enum import Enum
 
 from database import Barahl0botDatabase
@@ -13,6 +16,10 @@ from vk_api.exceptions import ApiError
 
 __author__ = 'fut33v'
 
+_LOGGER = logging.getLogger("barahl0bot")
+_LOGS_DIR = 'log'
+_FH_DEBUG = None
+_FH_ERROR = None
 
 REGEXP_ALBUM = re.compile("http[s]?://vk.com/album(-?\d*)_(\d*)")
 
@@ -153,6 +160,20 @@ def cancel_handler(update, context):
     return ConversationHandler.END
 
 
+def set_logger_handlers(name):
+    now = datetime.datetime.now()
+    now = now.strftime("%d_%m_%Y")
+
+    formatter = logging.Formatter('%(levelname)s %(asctime)s %(message)s')
+    log_filename = _LOGS_DIR + "/{}_{}_debug.log".format(name, now)
+    fh_debug = logging.FileHandler(log_filename)
+    fh_debug.setLevel(logging.DEBUG)
+    fh_debug.setFormatter(formatter)
+    _LOGGER.addHandler(fh_debug)
+    global _FH_DEBUG
+    _FH_DEBUG = fh_debug
+
+
 if __name__ == "__main__":
     if len(sys.argv) != 2:
         print("give me json with settings as argument!")
@@ -164,6 +185,9 @@ if __name__ == "__main__":
     _CHANNEL = _SETTINGS.channel
     _DATABASE = Barahl0botDatabase(_CHANNEL)
     _VK_INFO_GETTER = VkontakteInfoGetter(_SETTINGS.token_vk)
+
+    logger_file_name = "{}_{}".format("bot", _CHANNEL)
+    set_logger_handlers(logger_file_name)
 
     updater = Updater(_TOKEN_TELEGRAM, use_context=True)
     dispatcher = updater.dispatcher

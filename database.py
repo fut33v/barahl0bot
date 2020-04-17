@@ -1,5 +1,6 @@
 import logging
 import pymysql
+import time
 from structures import Album, Product, Seller
 
 _LOGGER = logging.getLogger("barahl0bot")
@@ -17,16 +18,25 @@ class Barahl0botDatabase:
         self._groups_table = "groups"
         return
 
+    def _execute(self, cursor, sql, args=tuple()):
+        try:
+            return cursor.execute(sql, args)
+        except (pymysql.err.OperationalError, pymysql.err.InterfaceError) as e:
+            _LOGGER.error("Problems with pyMySQL, reconnect...: {}".format(e))
+            self._connection.connect()
+            time.sleep(1)
+            return cursor.execute(sql, args)
+
     def get_albums_list(self):
-        with self._connection.cursor() as cursor:
-            sql = "SELECT * FROM {} ORDER BY owner_id".format(self._albums_table)
-            cursor.execute(sql)
+        sql = "SELECT * FROM {} ORDER BY owner_id".format(self._albums_table)
+        with self._connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            self._execute(cursor, sql)
             result = cursor.fetchall()
             if result:
                 albums = []
                 for a in result:
-                    owner_id = a[0]
-                    album_id = a[1]
+                    owner_id = a['owner_id']
+                    album_id = a['album_id']
                     albums.append(Album(owner_id, album_id))
                 return albums
         return False
@@ -35,7 +45,7 @@ class Barahl0botDatabase:
         with self._connection.cursor() as cursor:
             sql = "SELECT * FROM {t} WHERE owner_id = %s AND album_id = %s;". \
                 format(t=self._albums_table)
-            cursor.execute(sql, (album.owner_id, album.album_id))
+            self._execute(cursor, sql, (album.owner_id, album.album_id))
             result = cursor.fetchone()
             return result
 
@@ -50,14 +60,14 @@ class Barahl0botDatabase:
                   'VALUES(%s, %s, %s, %s, %s);'.\
                 format(t=self._albums_table)
 
-            cursor.execute(sql, (album.owner_id, album.album_id, album.title, album.description, album.photo))
+            self._execute(cursor, sql, (album.owner_id, album.album_id, album.title, album.description, album.photo))
 
         self._connection.commit()
 
     def delete_album(self, album):
         with self._connection.cursor() as cursor:
             sql = 'DELETE FROM {t} WHERE `owner_id`=%s AND `album_id`=%s;'.format(t=self._albums_table)
-            result = cursor.execute(sql, (album.owner_id, album.album_id))
+            result = self._execute(cursor, sql, (album.owner_id, album.album_id))
             self._connection.commit()
             return result
 
