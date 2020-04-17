@@ -1,19 +1,21 @@
-from util import bot_util
+import util
 import glob
 # import barahl0bot
 import vk_api
 import sys
 import os
+from settings import Barahl0botSettings
 
 _SETTINGS_JSON_FILENAME = "../settings.json"
-_SETTINGS = bot_util.load_json_file(_SETTINGS_JSON_FILENAME)
-_TOKEN_VK = _SETTINGS['token_vk']
+_SETTINGS = Barahl0botSettings(_SETTINGS_JSON_FILENAME)
+# _SETTINGS = bot_util.load_json_file(_SETTINGS_JSON_FILENAME)
+# _TOKEN_VK = _SETTINGS['token_vk']
 
 
 def parse_json_file(_filename, _already):
     sellers_set = set()
 
-    data = bot_util.load_json_file(_filename)
+    data = util.load_json_file(_filename)
 
     for good in data:
         seller = good['seller']
@@ -53,7 +55,7 @@ if __name__ == "__main__":
     already_got_sellers_set = set()
     if len(sys.argv) == 3:
         sellers_json_input = sys.argv[2]
-        sellers = bot_util.load_json_file(sellers_json_input)
+        sellers = util.load_json_file(sellers_json_input)
         if sellers:
             for s in sellers:
                 already_got_sellers_set.add(s['id'])
