@@ -90,7 +90,7 @@ class Barahl0botDatabase:
                   'name,' \
                   'screen_name,' \
                   'photo) ' \
-                  'VALUES(%s, %s, %s, %s, %s);'.format(t=self._groups_table)
+                  'VALUES(%s, %s, %s, %s);'.format(t=self._groups_table)
             cursor.execute(sql, (group.id, group.name, group.screen_name, group.photo))
 
         self._connection.commit()

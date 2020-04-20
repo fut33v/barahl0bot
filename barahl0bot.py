@@ -67,10 +67,9 @@ def add_album_handler(update, context):
                     # insert group in table if not exists
                     if album.owner_id < 0:
                         if not _DATABASE.is_group_in_table_by_id(album.owner_id):
-                            group = _VK_INFO_GETTER.get_groups([album.owner_id])
-                            if group:
-                                group = Group(group[0])
-                                _DATABASE.insert_group(group)
+                            groups = _VK_INFO_GETTER.get_groups([abs(album.owner_id)])
+                            if groups:
+                                _DATABASE.insert_group(groups[0])
                     # insert album
                     _DATABASE.insert_album(album)
                     response = "Альбом <b>{}</b> добавлен.\n".format(album.title, album_candidate)

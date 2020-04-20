@@ -228,8 +228,8 @@ class Group:
             if "id" in groups_get_by_id_result:
                 self.id = groups_get_by_id_result["id"]
             if "name" in groups_get_by_id_result:
-                self.id = groups_get_by_id_result["name"]
+                self.name = groups_get_by_id_result["name"]
             if "screen_name" in groups_get_by_id_result:
-                self.id = groups_get_by_id_result["screen_name"]
+                self.screen_name = groups_get_by_id_result["screen_name"]
             if "photo_200" in groups_get_by_id_result:
                 self.photo = groups_get_by_id_result["photo_200"]
