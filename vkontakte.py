@@ -12,10 +12,13 @@ def _get_widest_album_cover_photo_url(photo_sizes):
     photo_url = None
     max_width = 0
     for photo_size in photo_sizes:
+        # type = photo_size['type']
         width = photo_size['width']
         if width > max_width:
             photo_url = photo_size['src']
             max_width = width
+        if width == 0:
+            photo_url = photo_size['src']
     return photo_url
 
 
