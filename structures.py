@@ -117,7 +117,7 @@ class Product:
 
         return text
 
-    def build_message_telegram(self, _channel):
+    def build_message_telegram(self, channel, website):
         photo = self.photo
         photo_url = photo.get_widest_photo_url()
 
@@ -162,8 +162,11 @@ class Product:
         latest_product += "<b>Фото:</b> {}\n".format(photo.build_url())
 
         if self.is_duplicate and self.prev_tg_post:
-            latest_product += "<b>Предыдущее объявление:</b> <a href=\"https://t.me/{}/{}\">Telegram</a> | barahloch". \
-                format(_channel, self.prev_tg_post)
+            latest_product += \
+                "<b>Предыдущее объявление:</b> <a href=\"https://t.me/{}/{}\">Telegram</a> | {}goods/hash/{}". \
+                format(channel, self.prev_tg_post, website, self.photo_hash)
+
+        latest_product += "<b>История продавца:</b> <a href=\"{}seller/{}\">тут</a>\n".format(website, seller.vk_id)
 
         return latest_product
 

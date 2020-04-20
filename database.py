@@ -132,29 +132,30 @@ class Barahl0botDatabase:
 
         return False
 
-    def insert_product(self, _product):
-        if not _product.seller and _product.photo.owner_id > 0:
+    def insert_product(self, product):
+        if not product.seller and product.photo.owner_id > 0:
             _LOGGER.warning("Trying to add good without seller")
             return
 
         # if seller is group/public/community
-        if _product.seller.is_club():
-            seller_id = _product.photo.owner_id
+        if product.seller.is_club():
+            seller_id = product.photo.owner_id
         else:
-            seller_id = int(_product.seller.vk_id)
+            seller_id = int(product.seller.vk_id)
 
-        photo = _product.photo
-        tg_post_id = int(_product.tg_post_id)
+        photo = product.photo
+        tg_post_id = int(product.tg_post_id)
         photo_link = photo.get_widest_photo_url()
-        photo_hash = _product.photo_hash
-
-        descr = _product.get_description_text()
-        comments = _product.get_comments_text()
+        photo_hash = product.photo_hash
+        album_id = product.album.album_id
+        descr = product.get_description_text()
+        comments = product.get_comments_text()
 
         with self._connection.cursor() as cursor:
             sql = 'INSERT INTO {t} (' \
                   'vk_owner_id, ' \
                   'vk_photo_id, ' \
+                  'vk_album_id, ' \
                   'photo_link,' \
                   'seller_id,' \
                   'descr,' \
@@ -162,10 +163,10 @@ class Barahl0botDatabase:
                   'date,' \
                   'hash,' \
                   'comments) ' \
-                  'VALUES(%s, %s, %s, %s, %s, %s, NOW(), %s, %s);'.format(t=self._goods_table)
+                  'VALUES(%s, %s, %s, %s, %s, %s, %s, NOW(), %s, %s);'.format(t=self._goods_table)
 
             cursor.execute(sql, (
-                photo.owner_id, photo.photo_id, photo_link, seller_id, descr, tg_post_id, photo_hash, comments))
+                photo.owner_id, photo.photo_id, album_id, photo_link, seller_id, descr, tg_post_id, photo_hash, comments))
 
         self._connection.commit()
 

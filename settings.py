@@ -15,6 +15,8 @@ class Barahl0botSettings:
         self.admins = set(self._settings['admins'])
         self.channel = self._settings['channel']
 
+        self.website = self._settings['website']
+
         self.error_channel = self._get_setting('error_channel')
 
         self.seconds_to_sleep = 90

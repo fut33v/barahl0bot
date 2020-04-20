@@ -79,7 +79,7 @@ def try_update_post_message(product, product_from_db):
     product.photo_hash = product_from_db.photo_hash
     product.comments_text = product_from_db.comments_text
 
-    message_text = product.build_message_telegram(_CHANNEL)
+    message_text = product.build_message_telegram(_CHANNEL, _WEBSITE)
 
     # let's not bother telegram...
     _LOGGER.debug("Sleep before telegram message edit")
@@ -207,7 +207,7 @@ def set_logger_handlers():
 
 
 def post_telegram(_product):
-    message = _product.build_message_telegram(_CHANNEL)
+    message = _product.build_message_telegram(_CHANNEL, _WEBSITE)
     if not message:
         return None
     sent = post_to_channel_html(message, _CHANNEL)
@@ -296,6 +296,7 @@ if __name__ == "__main__":
 
     _TOKEN_TELEGRAM = _SETTINGS.token_telegram
     _CHANNEL = _SETTINGS.channel
+    _WEBSITE = _SETTINGS.website
     _ERROR_CHANNEL = _SETTINGS.error_channel
 
     _DATABASE = Barahl0botDatabase(_CHANNEL)
