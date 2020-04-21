@@ -163,7 +163,8 @@ class Product:
 
         if self.is_duplicate and self.prev_tg_post:
             latest_product += \
-                "<b>Предыдущее объявление:</b> <a href=\"https://t.me/{}/{}\">Telegram</a> | {}goods/hash/{}". \
+                "<b>Предыдущее объявление:</b> " \
+                "<a href=\"https://t.me/{}/{}\">Telegram</a> | <a href=\"{}goods/hash/{}\">barahloch</a> \n". \
                 format(channel, self.prev_tg_post, website, self.photo_hash)
 
         latest_product += "<b>История продавца:</b> <a href=\"{}seller/{}\">тут</a>\n".format(website, seller.vk_id)
