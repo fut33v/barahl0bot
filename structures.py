@@ -222,7 +222,7 @@ class Photo:
 
 
 class Group:
-    def __init__(self, groups_get_by_id_result):
+    def __init__(self, groups_get_by_id_result=None):
         self.id = None
         self.name = None
         self.screen_name = None
@@ -237,3 +237,10 @@ class Group:
                 self.screen_name = groups_get_by_id_result["screen_name"]
             if "photo_200" in groups_get_by_id_result:
                 self.photo = groups_get_by_id_result["photo_200"]
+
+
+class City:
+    def __init__(self, city_id, title):
+        self.id = city_id
+        self.title = title
+

@@ -5,3 +5,6 @@ data/
 settings.json
 log
 *.db
+*.sql
+barahlochannel*.json
+chat_export

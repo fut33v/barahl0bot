@@ -1,7 +1,7 @@
 import logging
 import pymysql
 import time
-from structures import Album, Product, Seller
+from structures import Album, Product, Seller, City, Group
 
 _LOGGER = logging.getLogger("barahl0bot")
 
@@ -80,6 +80,21 @@ class Barahl0botDatabase:
             if result:
                 return True
         return False
+
+    def get_group_by_id(self, group_id):
+        group_id = abs(group_id)
+        with self._connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            sql = "SELECT * FROM {t} WHERE `id`=%s".format(t=self._groups_table)
+            cursor.execute(sql, (group_id,))
+            result = cursor.fetchone()
+            if result:
+                g = Group()
+                g.id = result['id']
+                g.name = result['name']
+                g.screen_name = result['screen_name']
+                g.photo = result['photo']
+                return g
+        return None
 
     def insert_group(self, group):
         with self._connection.cursor() as cursor:
@@ -208,20 +223,12 @@ class Barahl0botDatabase:
         return False
 
     def insert_seller(self, seller):
-        if seller.is_club():
+        if not isinstance(seller, Seller):
             return
         with self._connection.cursor() as cursor:
-            if seller.city_id:
-                # insert city if not in table
-                sql = "SELECT * FROM {t} WHERE `id`=%s".format(t=self._cities_table)
-                cursor.execute(sql, (seller.city_id, ))
-                result = cursor.fetchone()
-                if not result:
-                    sql = 'INSERT INTO {t} (' \
-                          'id, ' \
-                          'title) ' \
-                          'VALUES(%s, %s);'.format(t=self._cities_table)
-                    cursor.execute(sql, (seller.city_id, seller.city_title))
+            if seller.city_id and seller.city_title:
+                city = City(seller.city_id, seller.city_title)
+                self.insert_city(city)
             # insert seller
             sql = 'INSERT INTO {t} (' \
                   'vk_id, ' \
@@ -233,6 +240,21 @@ class Barahl0botDatabase:
             cursor.execute(sql, (seller.vk_id, seller.first_name, seller.last_name, seller.city_id, seller.photo))
 
         self._connection.commit()
+
+    # insert city if not in table
+    def insert_city(self, city):
+        if not isinstance(city, City):
+            return
+        with self._connection.cursor() as cursor:
+            sql = "SELECT * FROM {t} WHERE `id`=%s".format(t=self._cities_table)
+            cursor.execute(sql, (city.id,))
+            result = cursor.fetchone()
+            if not result:
+                sql = 'INSERT INTO {t} (' \
+                      'id, ' \
+                      'title) ' \
+                      'VALUES(%s, %s);'.format(t=self._cities_table)
+                cursor.execute(sql, (city.id, city.title))
 
     def get_connection(self):
         return self._connection

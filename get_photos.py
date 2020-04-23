@@ -26,6 +26,8 @@ _LOGS_DIR = 'log'
 _FH_DEBUG = None
 _FH_ERROR = None
 
+_ERROR_GET_PHOTOS_X_PHOTOS_NONE_COUNT = 0
+
 
 def post_to_channel_html(message, channel):
     bot = telegram.Bot(token=_TOKEN_TELEGRAM)
@@ -123,7 +125,12 @@ def get_products_from_album(_album):
     comments = response['comments']
 
     if photos is None:
-        _LOGGER.error("'photos' is None in response for getPhotosX")
+        _LOGGER.warning("'photos' is None in response for getPhotosX for album {}".format(_album.build_url()))
+        global _ERROR_GET_PHOTOS_X_PHOTOS_NONE_COUNT
+        _ERROR_GET_PHOTOS_X_PHOTOS_NONE_COUNT += 1
+        if _ERROR_GET_PHOTOS_X_PHOTOS_NONE_COUNT > 500:
+            _LOGGER.error("'photos' is None in response for getPhotosX (500)")
+            _ERROR_GET_PHOTOS_X_PHOTOS_NONE_COUNT = 0
         return None
 
     for vk_photo_dict in photos:
@@ -247,11 +254,23 @@ def process_album(_album):
         if sent:
             p.tg_post_id = sent['message_id']
 
-            if not p.seller.is_club():
-                # check for seller and insert him/her if not in table
-                if not _DATABASE.is_seller_in_table_by_id(p.seller.vk_id):
+            if not _DATABASE.is_seller_in_table_by_id(p.seller.vk_id):
+                if not p.seller.is_club():
                     _DATABASE.insert_seller(p.seller)
                     _LOGGER.info("New seller saved: {} ".format(p.seller.build_url()))
+                else:
+                    group = _DATABASE.get_group_by_id(p.seller.vk_id)
+                    if not group:
+                        group = _VK_INFO_GETTER.get_group(p.seller.vk_id)
+                        _DATABASE.insert_group(group)
+                    if group:
+                        seller = Seller()
+                        seller.vk_id = -group.id
+                        seller.first_name = group.name
+                        seller.last_name = group.name
+                        seller.photo = group.photo
+                        _DATABASE.insert_seller(seller)
+                        _LOGGER.info("New group seller saved: {} ".format(p.seller.build_url()))
 
             # save product to database
             _DATABASE.insert_product(p)
@@ -302,6 +321,8 @@ if __name__ == "__main__":
     _DATABASE = Barahl0botDatabase(_CHANNEL)
 
     _VK_INFO_GETTER = VkontakteInfoGetter(_SETTINGS.token_vk)
+
+    _ERROR_GET_PHOTOS_X_PHOTOS_NONE_COUNT = 0
 
     try:
         if not os.path.exists(_LOGS_DIR):

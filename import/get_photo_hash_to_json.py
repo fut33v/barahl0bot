@@ -2,11 +2,12 @@ import glob
 import hashlib
 import os
 import sys
-from util import bot_util
+import util
 import re
 
+
 def get_photo_hash(_url):
-    photo = bot_util.urlopen(_url)
+    photo = util.urlopen(_url)
     if not photo:
         return None
     sha = hashlib.sha256()
@@ -28,7 +29,7 @@ if __name__ == "__main__":
 
     for messages_json_filename in messages:
         print(messages_json_filename)
-        goods = bot_util.load_json_file(messages_json_filename)
+        goods = util.load_json_file(messages_json_filename)
         goods_count = len(goods)
         i = 0
         for g in goods:
@@ -41,5 +42,5 @@ if __name__ == "__main__":
             i += 1
 
         json_filename = os.path.splitext(messages_json_filename)[0] + "_hash.json"
-        bot_util.save_json_file(json_filename, goods)
+        util.save_json_file(json_filename, goods)
         os.remove(messages_json_filename)
