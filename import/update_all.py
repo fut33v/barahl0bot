@@ -10,33 +10,15 @@ from vkontakte import VkontakteInfoGetter
 from structures import Seller, City
 
 
-def get_widest_photo_url(photo_sizes):
-    photo_url = None
-    max_width = 0
-    for photo_size in photo_sizes:
-        width = photo_size['width']
-        if width > max_width:
-            photo_url = photo_size['src']
-            max_width = width
-    return photo_url
-
-
 def update_albums():
     albums = _DATABASE.get_albums_list()
     for a in albums:
-        album_info = _VK.photos.getAlbums(owner_id=a.owner_id, album_ids=a.album_id, need_covers=1, photo_sizes=1)
-        if 'items' not in album_info or 'count' not in album_info:
-            continue
-        if album_info['count'] == 0:
-            continue
-        print(album_info)
-        album_info = album_info['items'][0]
+        _VKONTAKTE_GETTER.update_album_info(a)
         try:
             with _CONNECTION.cursor() as cur:
                 sql = 'UPDATE {}_albums SET title=%s, description=%s, photo=%s WHERE owner_id=%s and album_id =%s;'. \
                     format(settings.channel)
-                photo_url = get_widest_photo_url(album_info["sizes"])
-                cur.execute(sql, (album_info["title"], album_info["description"], photo_url, a.owner_id, a.album_id))
+                cur.execute(sql, (a.title, a.description, a.photo, a.owner_id, a.album_id))
                 print("The query affected {} rows".format(cur.rowcount))
             _CONNECTION.commit()
             time.sleep(1)
