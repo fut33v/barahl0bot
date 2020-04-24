@@ -72,8 +72,8 @@ def try_update_post_message(product, product_from_db):
 
     product.seller = seller
 
-    same_comments = product.get_comments_text() == product_from_db.comments_text
-    same_text = product.get_description_text() == product_from_db.descr
+    same_comments = product.get_comments_text(restrict=False) == product_from_db.comments_text
+    same_text = product.get_description_text(restrict=False) == product_from_db.descr
 
     if same_comments and same_text:
         return

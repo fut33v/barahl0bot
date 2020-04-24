@@ -78,7 +78,7 @@ class Product:
         if self.comments:
             self.comments_text = self.get_comments_text(self.comments)
 
-    def get_comments_text(self, _restrict=True):
+    def get_comments_text(self, restrict=True):
         if self.seller:
             seller_id = self.seller.vk_id
         else:
@@ -94,26 +94,24 @@ class Product:
                         if int(c['from_id']) == seller_id and c['text'] != "":
                             comments_str += c['text'] + '\n'
         if comments_str:
-            if _restrict:
+            if restrict:
                 comments_str = comments_str[:settings.COMMENTS_STRING_RESTRICTION]
             comments_str = comments_str.lower()
             comments_str = comments_str.replace('\n', ' ')
             comments_str = html.escape(comments_str)
-            # comments_str = make_numbers_bold(comments_str)
 
         return comments_str
 
-    def get_description_text(self, _restrict=True):
+    def get_description_text(self, restrict=True):
         text = self.photo.text
         if not text:
             return text
 
         text = text.lower()
         text = text.replace('\n', ' ')
-        if _restrict:
+        if restrict:
             text = text[:settings.DESCRIPTION_STRING_RESTRICTION]
         text = html.escape(text)
-        # text = make_numbers_bold(text)
 
         return text
 

@@ -163,8 +163,8 @@ class Barahl0botDatabase:
         photo_link = photo.get_widest_photo_url()
         photo_hash = product.photo_hash
         album_id = product.album.album_id
-        descr = product.get_description_text()
-        comments = product.get_comments_text()
+        descr = product.get_description_text(restrict=False)
+        comments = product.get_comments_text(restrict=False)
 
         with self._connection.cursor() as cursor:
             sql = 'INSERT INTO {t} (' \
@@ -187,8 +187,8 @@ class Barahl0botDatabase:
 
     def update_product_text_and_comments(self, product):
         photo = product.photo
-        text = product.get_description_text()
-        comments = product.get_comments_text()
+        text = product.get_description_text(restrict=False)
+        comments = product.get_comments_text(restrict=False)
         with self._connection.cursor() as cursor:
             sql = "UPDATE {t} SET descr = %s, comments = %s WHERE vk_owner_id = %s AND vk_photo_id = %s;".\
                 format(t=self._goods_table)
