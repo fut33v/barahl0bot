@@ -3,15 +3,18 @@ import re
 import sys
 import datetime
 import logging
-from enum import Enum
+from functools import partial
+from enum import Enum, IntEnum, auto
 
 from database import Barahl0botDatabase
 from settings import Barahl0botSettings
 from vkontakte import VkontakteInfoGetter
 from structures import Album, Group
 
-from telegram.ext import Updater, CommandHandler, ConversationHandler, Handler, MessageHandler, Filters
+from telegram.ext import \
+    Updater, CommandHandler, ConversationHandler, Handler, MessageHandler, Filters, CallbackQueryHandler
 import telegram.ext
+from telegram import InlineKeyboardMarkup, InlineKeyboardButton
 from vk_api.exceptions import ApiError
 
 __author__ = 'fut33v'
@@ -29,14 +32,14 @@ def start_handler(update, context):
     
     С помощью этого бота можно: 
     
-    + добавить объявление на канал *@barahlochannel*, 
+    + добавить объявление на канал *@{channel}* (/postitem), 
     + узнать список альбомов-источников канала. 
 
     *Github:* https://github.com/fut33v/barahl0bot
 
     *Техподдержка:* @fut33v
     
-"""
+""".format(channel=_CHANNEL)
 
     context.bot.send_message(update.effective_chat.id, response, parse_mode=telegram.ParseMode.MARKDOWN)
 
@@ -54,6 +57,8 @@ def get_albums_handler(update, context):
 
 def add_album_handler(update, context):
     if len(context.args) == 0:
+        return
+    if update.effective_user.username not in _SETTINGS.admins:
         return
     for album_candidate in context.args:
         m = REGEXP_ALBUM.match(album_candidate)
@@ -84,6 +89,8 @@ def add_album_handler(update, context):
 def remove_album_handler(update, context):
     if len(context.args) == 0:
         return
+    if update.effective_user.username not in _SETTINGS.admins:
+        return
     for album_candidate in context.args:
         print(album_candidate)
         m = REGEXP_ALBUM.match(album_candidate)
@@ -102,17 +109,132 @@ def remove_album_handler(update, context):
 
 class UserState(Enum):
     CHILLING = 0
-    WAITING_FOR_PHOTO = 1
-    WAITING_FOR_TEXT = 2,
-    WAITING_FOR_APPROVE = 3
+    WAITING_FOR_CATEGORY = 1
+    WAITING_FOR_SUBCATEGORY = 2
+    WAITING_FOR_PHOTO = 3
+    WAITING_FOR_TEXT = 4
+    WAITING_FOR_APPROVE = 5
+
+
+class CategoryEnum(IntEnum):
+    ROAD_CX_GRAVEL = 1
+    FIXED_SINGLE = 2
+
+
+class CategoryStringEnum(Enum):
+    ROAD_CX_GRAVEL = "Road, CX, Gravel, Touring - весь мультиспид."
+    FIXED_SINGLE = "Fixed Gear, Single Speed - фиксы и трещотки."
+
+
+class SubCategoryEnum(IntEnum):
+    BICYCLE = 1
+    COMPONENTS = 2
+    WHEELS = 3
+    WHEELS_COMPONENTS = 4
+    CLOTHES = 5
+    SHOES = 6
+    HELMETS = 7
+    ACCESSORIES = 8
+    BAGS = 9
+
+
+class SubCategoryStringEnum(Enum):
+    BICYCLE = "Велосипед - велосипед  в полной комплектации"
+    COMPONENTS = "Компоненты - рама, вилка и другие компоненты"
+    WHEELS = "Колеса - собранные колеса"
+    WHEELS_COMPONENTS = "Компоненты колес - обода, втулки, спицы, покрышки, камеры"
+    CLOTHES = "Одежда - джерси, кепки, велошорты, носки"
+    SHOES = "Обувь - велотуфли"
+    HELMETS = "Шлемы - защитные каски, шлемесы"
+    ACCESSORIES = "Аксессуары - очки, фонарики, насосы, велозамки, бутылки"
+    BAGS = "Сумки - байкпакинг и прочие велоштаны"
 
 
 ACTIVE_USERS = {}
+MESSAGE_ID = {}
 
 
-def add_item_handler(update, context):
-    message = "Пришлите фото (альбом пока не работает).\n\nИли нажмите /cancel для отмены."
-    context.bot.send_message(update.effective_chat.id, message)
+def post_item_handler(update, context):
+    message = """
+🚴‍♂️ Первым делом разберемся с категорией товара. Их немного, но они упростят поиск в канале.
+Выбери ту категорию, которая наиболее точно подходит тебе. 
+
+*Road, CX, Gravel, Touring* - весь мультиспид. 
+*Fixed Gear, Single Speed* - фиксы и трещотки. 
+"""
+    keyboard = [[InlineKeyboardButton("ROAD/CX/Gravel", callback_data=str(int(CategoryEnum.ROAD_CX_GRAVEL))),
+                 InlineKeyboardButton("Fixed gear/Single speed", callback_data=str(int(CategoryEnum.FIXED_SINGLE)))]]
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    message = context.bot.send_message(chat_id=update.effective_chat.id,
+                                       text=message, reply_markup=reply_markup, parse_mode=telegram.ParseMode.MARKDOWN)
+
+    MESSAGE_ID[update.effective_chat.id] = message.message_id
+
+    return UserState.WAITING_FOR_CATEGORY
+
+
+SUBCATEGORY_TEXT = """
+Теперь выбери подкатегорию:
+
+*Велосипед* - велосипед в полной комплектации. 
+*Компоненты* - рама, вилка и другие компоненты. 
+*Колеса* - собранные колеса. 
+*Компоненты колес* - обода, втулки, спицы, покрышки, камеры. 
+*Одежда* - джерси, кепки, велошорты, носки. 
+*Обувь* - велотуфли. 
+*Шлемы* - защитные каски. 
+*Аксессуары* - очки, фонарики, насосы, велозамки, бутылки. 
+*Сумки* - байкпакинг.
+"""
+
+
+def post_item_process_category(update, context, category):
+    keyboard = [
+        [InlineKeyboardButton("Велосипед", callback_data=str(int(SubCategoryEnum.BICYCLE))),
+         InlineKeyboardButton("Компоненты", callback_data=str(int(SubCategoryEnum.COMPONENTS)))],
+        [InlineKeyboardButton("Колеса", callback_data=str(int(SubCategoryEnum.WHEELS))),
+         InlineKeyboardButton("Компоненты колес", callback_data=str(int(SubCategoryEnum.WHEELS_COMPONENTS)))],
+
+        [InlineKeyboardButton("Одежда", callback_data=str(int(SubCategoryEnum.CLOTHES))),
+         InlineKeyboardButton("Обувь", callback_data=str(int(SubCategoryEnum.SHOES)))],
+
+        [InlineKeyboardButton("Шлемы", callback_data=str(int(SubCategoryEnum.HELMETS))),
+         InlineKeyboardButton("Аксессуары", callback_data=str(int(SubCategoryEnum.ACCESSORIES))),
+         InlineKeyboardButton("Сумки", callback_data=str(int(SubCategoryEnum.BAGS)))]]
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    prefix_text = "Ты выбрал категорию *{}*\n".format(CategoryStringEnum[category.name].value)
+
+    message_id_to_delete_keyboard = MESSAGE_ID[update.effective_chat.id]
+    context.bot.edit_message_reply_markup(chat_id=update.effective_chat.id,
+                                          reply_markup=None, message_id=message_id_to_delete_keyboard)
+
+    message_text = prefix_text + SUBCATEGORY_TEXT
+    message = context.bot.send_message(chat_id=update.effective_chat.id,
+                                       text=message_text, reply_markup=reply_markup,
+                                       parse_mode=telegram.ParseMode.MARKDOWN)
+
+    MESSAGE_ID[update.effective_chat.id] = message.message_id
+
+    return UserState.WAITING_FOR_SUBCATEGORY
+
+
+def postitem_sub(update, context, subcategory):
+    message_text = """
+📷 Пришли фотографию товара. 
+Можно отправить несколько фотографий как альбом в одном сообщении но при этом не более *10 штук*. 
+"""
+
+    prefix_text = "Ты выбрал подкатегорию *{}*\n".format(SubCategoryStringEnum[subcategory.name].value)
+    message_text = prefix_text + message_text
+    message_id_to_delete_keyboard = MESSAGE_ID[update.effective_chat.id]
+    context.bot.edit_message_reply_markup(chat_id=update.effective_chat.id,
+                                          reply_markup=None, message_id=message_id_to_delete_keyboard)
+    context.bot.send_message(chat_id=update.effective_chat.id,
+                             text=message_text, parse_mode=telegram.ParseMode.MARKDOWN)
     return UserState.WAITING_FOR_PHOTO
 
 
@@ -147,7 +269,7 @@ def add_item_process_text(update, context):
 def add_item_process_approve(update, context):
     description = ACTIVE_USERS[update.effective_user]["description"]
     photo_message = ACTIVE_USERS[update.effective_user]["photo"]
-    context.bot.send_photo(chat_id='@'+_CHANNEL, photo=photo_message.photo[-1].file_id, caption=description[:1024])
+    context.bot.send_photo(chat_id='@' + _CHANNEL, photo=photo_message.photo[-1].file_id, caption=description[:1024])
 
     message = "Товар размещен в барахолке."
     context.bot.send_message(update.effective_chat.id, message)
@@ -197,17 +319,30 @@ if __name__ == "__main__":
     dispatcher.add_handler(CommandHandler('removealbum', remove_album_handler))
 
     dispatcher.add_handler(
-        ConversationHandler(entry_points=[CommandHandler('additem', add_item_handler)],
+        ConversationHandler(entry_points=[CommandHandler('postitem', post_item_handler)],
                             states={
+                                UserState.WAITING_FOR_CATEGORY: [
+                                    CallbackQueryHandler(
+                                        partial(post_item_process_category, category=CategoryEnum.ROAD_CX_GRAVEL),
+                                        pattern='^' + str(int(CategoryEnum.ROAD_CX_GRAVEL)) + '$'),
+                                    CallbackQueryHandler(
+                                        partial(post_item_process_category, category=CategoryEnum.FIXED_SINGLE),
+                                        pattern='^' + str(int(CategoryEnum.FIXED_SINGLE)) + '$')
+                                ],
+                                UserState.WAITING_FOR_SUBCATEGORY: [
+                                    CallbackQueryHandler(partial(postitem_sub, subcategory=SubCategoryEnum.BICYCLE),
+                                                         pattern='^' + str(int(SubCategoryEnum.BICYCLE)) + '$'),
+                                    CallbackQueryHandler(partial(postitem_sub, subcategory=SubCategoryEnum.COMPONENTS),
+                                                         pattern='^' + str(int(SubCategoryEnum.COMPONENTS)) + '$'),
+                                ],
                                 UserState.WAITING_FOR_PHOTO: [MessageHandler(
                                     callback=add_item_process_photo, filters=Filters.photo)],
                                 UserState.WAITING_FOR_TEXT: [MessageHandler(
                                     callback=add_item_process_text, filters=Filters.text)],
                                 UserState.WAITING_FOR_APPROVE: [CommandHandler('done', add_item_process_approve)]
                             },
-                            fallbacks=[CommandHandler('cancel', cancel_handler)],)
+                            fallbacks=[CommandHandler('cancel', cancel_handler)], )
     )
 
     updater.start_polling()
     updater.idle()
-
