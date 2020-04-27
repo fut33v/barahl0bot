@@ -161,6 +161,7 @@ class Barahl0botDatabase:
         photo = product.photo
         tg_post_id = int(product.tg_post_id)
         photo_link = photo.get_widest_photo_url()
+        photo_preview_link = photo.get_preview_photo_url()
         photo_hash = product.photo_hash
         album_id = product.album.album_id
         descr = product.get_description_text(restrict=False)
@@ -172,16 +173,26 @@ class Barahl0botDatabase:
                   'vk_photo_id, ' \
                   'vk_album_id, ' \
                   'photo_link,' \
+                  'photo_preview,' \
                   'seller_id,' \
                   'descr,' \
                   'tg_post_id,' \
                   'date,' \
                   'hash,' \
                   'comments) ' \
-                  'VALUES(%s, %s, %s, %s, %s, %s, %s, NOW(), %s, %s);'.format(t=self._goods_table)
+                  'VALUES(%s, %s, %s, %s, %s, %s, %s, %s, NOW(), %s, %s);'.format(t=self._goods_table)
 
             cursor.execute(sql, (
-                photo.owner_id, photo.photo_id, album_id, photo_link, seller_id, descr, tg_post_id, photo_hash, comments))
+                photo.owner_id,
+                photo.photo_id,
+                album_id,
+                photo_link,
+                photo_preview_link,
+                seller_id,
+                descr,
+                tg_post_id,
+                photo_hash,
+                comments))
 
         self._connection.commit()
 

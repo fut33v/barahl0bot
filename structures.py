@@ -211,6 +211,10 @@ class Photo:
                 max_width = width
         return photo_url
 
+    def get_preview_photo_url(self):
+        photo_url = self.sizes[-2]['url']
+        return photo_url
+
     def get_photo_id_str(self):
         return str(self.owner_id) + "_" + str(self.photo_id)
 
