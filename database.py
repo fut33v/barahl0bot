@@ -252,7 +252,6 @@ class Barahl0botDatabase:
 
         self._connection.commit()
 
-    # insert city if not in table
     def insert_city(self, city):
         if not isinstance(city, City):
             return
@@ -266,6 +265,28 @@ class Barahl0botDatabase:
                       'title) ' \
                       'VALUES(%s, %s);'.format(t=self._cities_table)
                 cursor.execute(sql, (city.id, city.title))
+
+    def get_top_cities(self, limit):
+        with self._connection.cursor(pymysql.cursors.DictCursor) as cursor:
+            sql = \
+                "SELECT city_id, count(*) as COUNTER " \
+                "FROM {t} " \
+                "GROUP BY city_id " \
+                "HAVING city_id " \
+                "ORDER BY counter DESC LIMIT %s".format(t=self._sellers_table)
+            self._execute(cursor, sql, (limit, ))
+            result = cursor.fetchall()
+            if not result:
+                return None
+            city_ids = [x['city_id'] for x in result]
+            sql = "SELECT * from {t} WHERE id IN (%s)".format(t=self._cities_table)
+            format_strings = ','.join(['%s'] * len(city_ids))
+            self._execute(cursor, sql % format_strings, tuple(city_ids, ))
+            result = cursor.fetchall()
+            cities = []
+            for c in result:
+                cities.append(City(c['id'], c['title']))
+            return cities
 
     def get_connection(self):
         return self._connection

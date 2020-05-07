@@ -6,6 +6,8 @@
   "admins": ["fut33v"],
   "seconds_to_sleep": 120,
   "timeout_for_photo_seconds" : 180,
-  "too_old_for_photo_seconds": 86400
+  "too_old_for_photo_seconds": 86400,
+
+  "days_timeout_for_product": 3
 }
 
