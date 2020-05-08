@@ -124,8 +124,6 @@ class Chat:
         self.prev_message_id = None
         self.user_state = None
 
-        self.parent_category = None
-        self.category = None
         self.category_dict = {0: None, 1: None, 2: None}
 
         self.photo_message = None
@@ -142,7 +140,7 @@ class Chat:
             if c[1] is not None:
                 category_string += c[1].value + "/"
 
-        return category_string
+        return category_string[:-1]
 
     def get_hashtags(self):
         hashtags = ""
@@ -166,7 +164,7 @@ class UserState(Enum):
     WAITING_FOR_APPROVE = 9
 
     WAITING_FOR_BICYCLE = 20
-    WAITING_FOR_COMPONENT = 21
+    WAITING_FOR_BIKEPARTS = 21
     WAITING_FOR_WHEELS = 22
     WAITING_FOR_ACCESSORIES = 23
     WAITING_FOR_BAGS = 24
@@ -174,17 +172,18 @@ class UserState(Enum):
 
     WAITING_FOR_SEATING = 31
     WAITING_FOR_PEDALS = 32
-    WAITING_FOR_STEERING = 32
+    WAITING_FOR_STEERING = 33
+    WAITING_FOR_DRIVETRAIN = 34
 
 
 class CategoryEnum(Enum):
     BICYCLE = "Велосипед"
-    COMPONENTS = "Компоненты"
-    WHEELS = "Колеса и покрышки"
-    SERVICE = "Обслуживание"
+    BIKEPARTS = "Компоненты"
+    WHEELSNTYRES = "Колеса и покрышки"
+    MAINTENANCE = "Обслуживание"
     ACCESSORIES = "Аксессуары"
     CLOTHES = "Одежда"
-    SHOES = "Обувь"
+    FOOTWEAR = "Обувь"
     HELMETS = "Шлемы"
     BAGS = "Сумки"
 
@@ -198,19 +197,19 @@ class BicycleCategoryEnum(Enum):
     TOURING = "Туринг"
 
 
-class ComponentCategoryEnum(Enum):
+class BikepartsCategoryEnum(Enum):
     FRAME = "Рама"
     FORK = "Вилка"
     BRAKES = "Тормоза"
     STEERING = "Рулевое управление"
     SEATING = "Седла и штыри"
-    TRANSMISSION = "Трансмиссия"
+    DRIVETRAIN = "Трансмиссия"
     PEDALS = "Педали и шипы"
 
 
 class SeatingCategoryEnum(Enum):
     SADDLES = "Седла"
-    SEATPOST = "Подседел"
+    SEATPOSTS = "Подседел"
     SEATCLAMPS = "Зажим"
 
 
@@ -231,6 +230,21 @@ class SteeringCategoryEnum(Enum):
     GRIPS = "Грипсы"
 
 
+class DrivetrainCategoryEnum(Enum):
+    GROUPSETS = "Групсеты"
+    CHAINSETS = "Системы"
+    CHAINS = "Цепи"
+    BOTTOMBRACKETS = "Каретки"
+    CHAINRINGS = "Звезды (перед)"
+    FRONT_DERAILLEURS = "Перед. переклюк"
+    CASSETES = "Кассеты"
+    FREEHUBS = "Барабаны"
+    REAR_DERAILLEURS = "Зад. переклюк"
+    SHIFTERS = "Шифтеры"
+    DERAILLEUR_HANGERS = "Петухи"
+    CABLES = "Тросики"
+
+
 class WheelsCategoryEnum(Enum):
     WHEELS = "Колеса"
     HUBS = "Втулки"
@@ -240,10 +254,10 @@ class WheelsCategoryEnum(Enum):
     SPOKES = "Спицы"
 
 
-class ServiceCategoryEnum(Enum):
+class MaintenanceCategoryEnum(Enum):
     PUMPS = "Насосы"
     TOOLS = "Инструменты"
-    WORKSTAND = "Стойки и стенды"
+    STANDS = "Стойки и стенды"
 
 
 class AccessoriesCategoryEnum(Enum):
@@ -251,7 +265,7 @@ class AccessoriesCategoryEnum(Enum):
     LOCK = "Замки"
     LIGHT = "Фонари"
     BOTTLE = "Фляги и флягодержатели"
-    COMPUTER = "Велокомпы"
+    COMPUTERS = "Велокомпы"
     MUDGUARD = "Крылья"
     RACK = "Багажники"
     TRAINER = "Станки"
@@ -305,16 +319,20 @@ def get_button_for_enum(enum_member):
     return InlineKeyboardButton(enum_member.value, callback_data=enum_member.name)
 
 
-def keyboard_for_enum(enum):
+def keyboard_for_enum(enum, columns=2):
     keyboard = []
-    counter = 0
+    counter = 1
     row = []
     for e in enum:
         row.append(get_button_for_enum(e))
-        if counter % 2 == 0:
+        if counter % columns == 0:
             keyboard.append(row)
             row = []
         counter += 1
+
+    if row:
+        keyboard.append(row)
+
     return keyboard
 
 
@@ -420,7 +438,8 @@ def edit_prev_keyboard(update, context, reply_markup):
 
 
 def post_item_command_handler(update, context):
-    message_text = "⬇️⬇️⬇  ⬇️⬇️⬇️"
+    message_text = "⬇️⬇️⬇   Жми кнопку давай   ⬇️⬇️⬇️"
+    message_text = "Ну чо народ погнали ⬇️⬇️⬇️"
     keyboard = [[InlineKeyboardButton(CallbackDataEnum.POSTITEM.value, callback_data=CallbackDataEnum.POSTITEM.name)]]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -437,16 +456,16 @@ def post_item_handler(update, context, keyboard_only=False):
 
     keyboard = [
         [InlineKeyboardButton(CategoryEnum.BICYCLE.value, callback_data=CategoryEnum.BICYCLE.name),
-         InlineKeyboardButton(CategoryEnum.COMPONENTS.value, callback_data=CategoryEnum.COMPONENTS.name)],
+         InlineKeyboardButton(CategoryEnum.BIKEPARTS.value, callback_data=CategoryEnum.BIKEPARTS.name)],
 
-        [InlineKeyboardButton(CategoryEnum.WHEELS.value, callback_data=CategoryEnum.WHEELS.name),
-         InlineKeyboardButton(CategoryEnum.SERVICE.value, callback_data=CategoryEnum.SERVICE.name)],
+        [InlineKeyboardButton(CategoryEnum.WHEELSNTYRES.value, callback_data=CategoryEnum.WHEELSNTYRES.name),
+         InlineKeyboardButton(CategoryEnum.MAINTENANCE.value, callback_data=CategoryEnum.MAINTENANCE.name)],
 
         [InlineKeyboardButton(CategoryEnum.ACCESSORIES.value, callback_data=CategoryEnum.ACCESSORIES.name),
          InlineKeyboardButton(CategoryEnum.BAGS.value, callback_data=CategoryEnum.BAGS.name)],
 
         [InlineKeyboardButton(CategoryEnum.CLOTHES.value, callback_data=CategoryEnum.CLOTHES.name),
-         InlineKeyboardButton(CategoryEnum.SHOES.value, callback_data=CategoryEnum.SHOES.name),
+         InlineKeyboardButton(CategoryEnum.FOOTWEAR.value, callback_data=CategoryEnum.FOOTWEAR.name),
          InlineKeyboardButton(CategoryEnum.HELMETS.value, callback_data=CategoryEnum.HELMETS.name)]]
 
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -470,66 +489,36 @@ def post_item_category(update, context, category):
         return ConversationHandler.END
 
     if category == CategoryEnum.BICYCLE:
-        return post_item_bicycle_category(update, context)
-    if category == CategoryEnum.COMPONENTS:
-        return post_item_component_category(update, context)
+        return post_item_show_subcategory(update, context, BicycleCategoryEnum, UserState.WAITING_FOR_BICYCLE)
+    if category == CategoryEnum.BIKEPARTS:
+        return post_item_show_subcategory(update, context, BikepartsCategoryEnum, UserState.WAITING_FOR_BIKEPARTS)
     if category == CategoryEnum.ACCESSORIES:
         return post_item_show_subcategory(update, context, AccessoriesCategoryEnum, UserState.WAITING_FOR_ACCESSORIES)
-    if category == CategoryEnum.WHEELS:
+    if category == CategoryEnum.WHEELSNTYRES:
         return post_item_show_subcategory(update, context, WheelsCategoryEnum, UserState.WAITING_FOR_WHEELS)
     if category == CategoryEnum.BAGS:
         return post_item_show_subcategory(update, context, BagsCategoryEnum, UserState.WAITING_FOR_BAGS)
-    if category == CategoryEnum.SERVICE:
-        return post_item_show_subcategory(update, context, ServiceCategoryEnum, UserState.WAITING_FOR_SERVICE)
+    if category == CategoryEnum.MAINTENANCE:
+        return post_item_show_subcategory(update, context, MaintenanceCategoryEnum, UserState.WAITING_FOR_SERVICE)
 
     delete_prev_keyboard(update, context)
 
     if category == CategoryEnum.CLOTHES:
+        get_chat(update).category_dict[0] = category
         return post_item_pre_photo(update, context, category)
-    if category == CategoryEnum.SHOES:
+    if category == CategoryEnum.FOOTWEAR:
+        get_chat(update).category_dict[0] = category
         return post_item_pre_photo(update, context, category)
     if category == CategoryEnum.HELMETS:
+        get_chat(update).category_dict[0] = category
         return post_item_pre_photo(update, context, category)
-
-
-def post_item_bicycle_category(update, context):
-    keyboard = [
-        [get_button_for_enum(BicycleCategoryEnum.ROAD), get_button_for_enum(BicycleCategoryEnum.FIX)],
-        [get_button_for_enum(BicycleCategoryEnum.CYCLOCROSS), get_button_for_enum(BicycleCategoryEnum.SINGLE)],
-
-        [get_button_for_enum(BicycleCategoryEnum.GRAVEL), get_button_for_enum(BicycleCategoryEnum.TOURING)],
-
-        [get_button_for_enum(CallbackDataEnum.BACK)],
-    ]
-
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
-    edit_prev_keyboard(update, context, reply_markup)
-
-    return save_current_state(update, UserState.WAITING_FOR_BICYCLE)
-
-
-def post_item_component_category(update, context):
-    keyboard = [
-        [get_button_for_enum(ComponentCategoryEnum.FRAME), get_button_for_enum(ComponentCategoryEnum.FORK)],
-        [get_button_for_enum(ComponentCategoryEnum.BRAKES), get_button_for_enum(ComponentCategoryEnum.STEERING)],
-
-        [get_button_for_enum(ComponentCategoryEnum.SEATING),
-         get_button_for_enum(ComponentCategoryEnum.TRANSMISSION),
-         get_button_for_enum(ComponentCategoryEnum.PEDALS)],
-
-        [get_button_for_enum(CallbackDataEnum.BACK)],
-    ]
-
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
-    edit_prev_keyboard(update, context, reply_markup)
-
-    return save_current_state(update, UserState.WAITING_FOR_COMPONENT)
 
 
 def post_item_show_subcategory(update, context, category_enum, state):
-    keyboard = keyboard_for_enum(category_enum)
+    keyboard_columns = 2
+    if len(category_enum) > 9 or category_enum == MaintenanceCategoryEnum:
+        keyboard_columns = 3
+    keyboard = keyboard_for_enum(category_enum, keyboard_columns)
     keyboard.append([get_button_for_enum(CallbackDataEnum.BACK)])
     reply_markup = InlineKeyboardMarkup(keyboard)
     edit_prev_keyboard(update, context, reply_markup)
@@ -542,7 +531,7 @@ def post_item_go_back(update, context):
     new_state = ConversationHandler.END
 
     if state in (UserState.WAITING_FOR_BICYCLE,
-                 UserState.WAITING_FOR_COMPONENT,
+                 UserState.WAITING_FOR_BIKEPARTS,
                  UserState.WAITING_FOR_WHEELS,
                  UserState.WAITING_FOR_BAGS,
                  UserState.WAITING_FOR_ACCESSORIES,
@@ -551,87 +540,62 @@ def post_item_go_back(update, context):
 
     if state in (UserState.WAITING_FOR_SEATING,
                  UserState.WAITING_FOR_STEERING,
-                 UserState.WAITING_FOR_PEDALS):
-        return post_item_component_category(update, context)
+                 UserState.WAITING_FOR_PEDALS,
+                 UserState.WAITING_FOR_DRIVETRAIN):
+        return post_item_show_subcategory(update, context, BikepartsCategoryEnum, UserState.WAITING_FOR_BIKEPARTS)
 
     return new_state
 
 
-def post_item_seating_category(update, context):
-    keyboard = [
-        [get_button_for_enum(SeatingCategoryEnum.SADDLES),
-         get_button_for_enum(SeatingCategoryEnum.SEATPOST),
-         get_button_for_enum(SeatingCategoryEnum.ZAZHIM)],
+def update_chat_category_dict(update, category):
+    if isinstance(category, BicycleCategoryEnum):
+        get_chat(update).category_dict[0] = CategoryEnum.BICYCLE
+        get_chat(update).category_dict[1] = category
+    if isinstance(category, WheelsCategoryEnum):
+        get_chat(update).category_dict[0] = CategoryEnum.WHEELSNTYRES
+        get_chat(update).category_dict[1] = category
+    if isinstance(category, AccessoriesCategoryEnum):
+        get_chat(update).category_dict[0] = CategoryEnum.ACCESSORIES
+        get_chat(update).category_dict[1] = category
+    if isinstance(category, BagsCategoryEnum):
+        get_chat(update).category_dict[0] = CategoryEnum.BAGS
+        get_chat(update).category_dict[1] = category
+    if isinstance(category, MaintenanceCategoryEnum):
+        get_chat(update).category_dict[0] = CategoryEnum.MAINTENANCE
+        get_chat(update).category_dict[1] = category
 
-        [get_button_for_enum(CallbackDataEnum.BACK)],
-    ]
-
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
-    edit_prev_keyboard(update, context, reply_markup)
-
-    return save_current_state(update, UserState.WAITING_FOR_SEATING)
-
-
-def post_item_pedals_category(update, context):
-    keyboard = [
-        [get_button_for_enum(PedalsCategoryEnum.PEDALS), get_button_for_enum(PedalsCategoryEnum.CLEATS)],
-        [get_button_for_enum(PedalsCategoryEnum.STRAPS), get_button_for_enum(PedalsCategoryEnum.TOECLIP)],
-
-        [get_button_for_enum(CallbackDataEnum.BACK)],
-    ]
-
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
-    edit_prev_keyboard(update, context, reply_markup)
-
-    return save_current_state(update, UserState.WAITING_FOR_PEDALS)
-
-
-def post_item_steering_category(update, context):
-    keyboard = [
-        [get_button_for_enum(SteeringCategoryEnum.HANDLEBARS), get_button_for_enum(SteeringCategoryEnum.STEMS)],
-        [get_button_for_enum(SteeringCategoryEnum.HEADSETS), get_button_for_enum(SteeringCategoryEnum.TOPCAPS)],
-
-        [get_button_for_enum(SteeringCategoryEnum.SPACERS),
-         get_button_for_enum(SteeringCategoryEnum.BARTAPES),
-         get_button_for_enum(SteeringCategoryEnum.GRIPS)],
-
-        [get_button_for_enum(CallbackDataEnum.BACK)],
-    ]
-
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
-    edit_prev_keyboard(update, context, reply_markup)
-
-    return save_current_state(update, UserState.WAITING_FOR_STEERING)
+    if isinstance(category, SeatingCategoryEnum):
+        get_chat(update).category_dict[0] = CategoryEnum.BIKEPARTS
+        get_chat(update).category_dict[1] = BikepartsCategoryEnum.SEATING
+        get_chat(update).category_dict[2] = category
+    if isinstance(category, PedalsCategoryEnum):
+        get_chat(update).category_dict[0] = CategoryEnum.BIKEPARTS
+        get_chat(update).category_dict[1] = BikepartsCategoryEnum.PEDALS
+        get_chat(update).category_dict[2] = category
+    if isinstance(category, SteeringCategoryEnum):
+        get_chat(update).category_dict[0] = CategoryEnum.BIKEPARTS
+        get_chat(update).category_dict[1] = BikepartsCategoryEnum.STEERING
+        get_chat(update).category_dict[2] = category
+    if isinstance(category, DrivetrainCategoryEnum):
+        get_chat(update).category_dict[0] = CategoryEnum.BIKEPARTS
+        get_chat(update).category_dict[1] = BikepartsCategoryEnum.DRIVETRAIN
+        get_chat(update).category_dict[2] = category
 
 
 def post_item_process_subcategory(update, context, category):
     delete_prev_keyboard(update, context)
 
-    if isinstance(category, ComponentCategoryEnum):
-        get_chat(update).category_dict[0] = CategoryEnum.COMPONENTS
-        get_chat(update).category_dict[1] = category
-        if category == ComponentCategoryEnum.SEATING:
-            return post_item_seating_category(update, context)
-        if category == ComponentCategoryEnum.PEDALS:
-            return post_item_pedals_category(update, context)
-        if category == ComponentCategoryEnum.STEERING:
-            return post_item_steering_category(update, context)
+    if isinstance(category, BikepartsCategoryEnum):
+        if category == BikepartsCategoryEnum.SEATING:
+            return post_item_show_subcategory(update, context, SeatingCategoryEnum, UserState.WAITING_FOR_SEATING)
+        if category == BikepartsCategoryEnum.PEDALS:
+            return post_item_show_subcategory(update, context, SeatingCategoryEnum, UserState.WAITING_FOR_PEDALS)
+        if category == BikepartsCategoryEnum.STEERING:
+            return post_item_show_subcategory(update, context, SeatingCategoryEnum, UserState.WAITING_FOR_STEERING)
+        if category == BikepartsCategoryEnum.DRIVETRAIN:
+            return post_item_show_subcategory(update, context, DrivetrainCategoryEnum, UserState.WAITING_FOR_DRIVETRAIN)
 
-    if isinstance(category, SeatingCategoryEnum):
-        get_chat(update).category_dict[0] = CategoryEnum.COMPONENTS
-        get_chat(update).category_dict[1] = ComponentCategoryEnum.SEATING
-        get_chat(update).category_dict[2] = category
-    if isinstance(category, PedalsCategoryEnum):
-        get_chat(update).category_dict[0] = CategoryEnum.COMPONENTS
-        get_chat(update).category_dict[1] = ComponentCategoryEnum.PEDALS
-        get_chat(update).category_dict[2] = category
-    if isinstance(category, SteeringCategoryEnum):
-        get_chat(update).category_dict[0] = CategoryEnum.COMPONENTS
-        get_chat(update).category_dict[1] = ComponentCategoryEnum.STEERING
-        get_chat(update).category_dict[2] = category
+    update_chat_category_dict(update, category)
 
     message_text = photo_message_text()
 
@@ -651,6 +615,10 @@ def post_item_pre_photo(update, context, category):
     get_chat(update).category_dict[0] = category
 
     message_text = photo_message_text()
+
+    category_string = get_chat(update).get_full_category_string()
+    message_text = "*{}*\n{}".format(category_string, message_text)
+
     message = context.bot.send_message(chat_id=update.effective_chat.id,
                                        text=message_text, parse_mode=telegram.ParseMode.MARKDOWN)
 
@@ -941,15 +909,16 @@ if __name__ == "__main__":
 
     waiting_for_bicycle_h = do_shit(BicycleCategoryEnum)
 
-    waiting_for_component_h = do_shit(ComponentCategoryEnum)
+    waiting_for_component_h = do_shit(BikepartsCategoryEnum)
     waiting_for_seating_h = do_shit(SeatingCategoryEnum)
     waiting_for_steering_h = do_shit(SteeringCategoryEnum)
     waiting_for_pedals_h = do_shit(PedalsCategoryEnum)
+    waiting_for_drivetrain_h = do_shit(DrivetrainCategoryEnum)
 
     waiting_for_accessories_h = do_shit(AccessoriesCategoryEnum)
     waiting_for_bags_h = do_shit(BagsCategoryEnum)
     waiting_for_wheels_h = do_shit(WheelsCategoryEnum)
-    waiting_for_service_h = do_shit(ServiceCategoryEnum)
+    waiting_for_service_h = do_shit(MaintenanceCategoryEnum)
 
     top_cities = get_top_cities()
 
@@ -963,11 +932,12 @@ if __name__ == "__main__":
                                           pattern='^' + x.name + '$') for x in CategoryEnum],
 
                 UserState.WAITING_FOR_BICYCLE: waiting_for_bicycle_h,
-                UserState.WAITING_FOR_COMPONENT: waiting_for_component_h,
+                UserState.WAITING_FOR_BIKEPARTS: waiting_for_component_h,
 
                 UserState.WAITING_FOR_SEATING: waiting_for_seating_h,
                 UserState.WAITING_FOR_STEERING: waiting_for_steering_h,
                 UserState.WAITING_FOR_PEDALS: waiting_for_pedals_h,
+                UserState.WAITING_FOR_DRIVETRAIN: waiting_for_drivetrain_h,
 
                 UserState.WAITING_FOR_WHEELS: waiting_for_wheels_h,
                 UserState.WAITING_FOR_ACCESSORIES: waiting_for_accessories_h,
