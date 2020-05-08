@@ -1,21 +1,22 @@
-from os import path
 import re
-import sys
 import datetime
 import logging
+import re
+import sys
+import html
+from enum import Enum
 from functools import partial
-from enum import Enum, IntEnum, auto
+
+import telegram.ext
+from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+from telegram.ext import Updater, CommandHandler, ConversationHandler, MessageHandler, Filters, CallbackQueryHandler
+from vk_api.exceptions import ApiError
 
 from database import Barahl0botDatabase
 from settings import Barahl0botSettings
+from structures import Album
 from vkontakte import VkontakteInfoGetter
-from structures import Album, Group
-
-from telegram.ext import \
-    Updater, CommandHandler, ConversationHandler, Handler, MessageHandler, Filters, CallbackQueryHandler
-import telegram.ext
-from telegram import InlineKeyboardMarkup, InlineKeyboardButton
-from vk_api.exceptions import ApiError
+import util
 
 __author__ = 'fut33v'
 
@@ -25,13 +26,7 @@ _FH_DEBUG = None
 _FH_ERROR = None
 
 REGEXP_ALBUM = re.compile("http[s]?://vk.com/album(-?\d*)_(\d*)")
-
-
-def send_message(update, context, message_text, reply_markup=None):
-    return context.bot.send_message(chat_id=update.effective_chat.id,
-                                    text=message_text,
-                                    parse_mode=telegram.ParseMode.MARKDOWN,
-                                    reply_markup=reply_markup)
+REGEXP_ONLY_DIGITS = re.compile(r'^\d*$')
 
 
 def start_handler(update, context):
@@ -129,6 +124,10 @@ class Chat:
         self.prev_message_id = None
         self.user_state = None
 
+        self.parent_category = None
+        self.category = None
+        self.category_dict = {0: None, 1: None, 2: None}
+
         self.photo_message = None
         self.currency = None
         self.price = None
@@ -137,9 +136,25 @@ class Chat:
         self.caption = None
         self.description = None
 
+    def get_full_category_string(self):
+        category_string = ""
+        for c in self.category_dict.items():
+            if c[1] is not None:
+                category_string += c[1].value + "/"
+
+        return category_string
+
+    def get_hashtags(self):
+        hashtags = ""
+        for c in self.category_dict.items():
+            if c[1] is not None:
+                hashtags += "#" + c[1].name.lower() + " "
+        return hashtags
+
 
 class UserState(Enum):
     CHILLING = 0
+
     WAITING_FOR_CATEGORY = 1
     WAITING_FOR_PHOTO = 2
     WAITING_FOR_CURRENCY = 3
@@ -152,6 +167,14 @@ class UserState(Enum):
 
     WAITING_FOR_BICYCLE = 20
     WAITING_FOR_COMPONENT = 21
+    WAITING_FOR_WHEELS = 22
+    WAITING_FOR_ACCESSORIES = 23
+    WAITING_FOR_BAGS = 24
+    WAITING_FOR_SERVICE = 25
+
+    WAITING_FOR_SEATING = 31
+    WAITING_FOR_PEDALS = 32
+    WAITING_FOR_STEERING = 32
 
 
 class CategoryEnum(Enum):
@@ -180,9 +203,32 @@ class ComponentCategoryEnum(Enum):
     FORK = "Вилка"
     BRAKES = "Тормоза"
     STEERING = "Рулевое управление"
-    SADDLES = "Седла и штыри"
+    SEATING = "Седла и штыри"
     TRANSMISSION = "Трансмиссия"
     PEDALS = "Педали и шипы"
+
+
+class SeatingCategoryEnum(Enum):
+    SADDLES = "Седла"
+    SEATPOST = "Подседел"
+    SEATCLAMPS = "Зажим"
+
+
+class PedalsCategoryEnum(Enum):
+    PEDALS = "Педали"
+    CLEATS = "Шипы"
+    STRAPS = "Стрепы"
+    TOECLIP = "Туклипсы"
+
+
+class SteeringCategoryEnum(Enum):
+    HANDLEBARS = "Рули"
+    STEMS = "Выносы"
+    HEADSETS = "Рулевые"
+    TOPCAPS = "Топкепы"
+    SPACERS = "Проставочные кольца"
+    BARTAPES = "Обмотки"
+    GRIPS = "Грипсы"
 
 
 class WheelsCategoryEnum(Enum):
@@ -233,8 +279,9 @@ class CurrencyEnum(Enum):
 
 
 class ShippingEnum(Enum):
-    DO_NOT_SHIP = "Не отправляю!"
-    WILL_SHIP = "Хоть на луну)"
+    DO_NOT_SHIP = "Не отправляю"
+    WILL_SHIP_BY_CUSTOMER = "За счет покупателя"
+    WILL_SHIP_SAINT = "За свой счёт"
 
 
 class CallbackDataEnum(Enum):
@@ -246,30 +293,29 @@ class CallbackDataEnum(Enum):
     CITY = 'City'
 
 
-HASHTAGS = {
-    BicycleCategoryEnum.ROAD: "road",
-    BicycleCategoryEnum.CYCLOCROSS: "cx",
-    BicycleCategoryEnum.FIX: "fix",
-    BicycleCategoryEnum.SINGLE: "single",
-    BicycleCategoryEnum.GRAVEL: "gravel",
-    BicycleCategoryEnum.TOURING: "touring",
-    CategoryEnum.BICYCLE: "complete",
-    CategoryEnum.COMPONENTS: "components",
-    CategoryEnum.HELMETS: "helmet",
-    CategoryEnum.SHOES: "shoes",
-    CategoryEnum.CLOTHES: "clothes",
-    CategoryEnum.BAGS: "bags",
-    CategoryEnum.ACCESSORIES: "accessories",
-    CategoryEnum.SERVICE: "service",
-    CategoryEnum.WHEELS: "wheels",
-}
-
 CHATS_DICT = {}
 POSTFIX_CANCEL = "\n/cancel для отмены."
 
 
 def get_top_cities():
     return _DATABASE.get_top_cities(10)
+
+
+def get_button_for_enum(enum_member):
+    return InlineKeyboardButton(enum_member.value, callback_data=enum_member.name)
+
+
+def keyboard_for_enum(enum):
+    keyboard = []
+    counter = 0
+    row = []
+    for e in enum:
+        row.append(get_button_for_enum(e))
+        if counter % 2 == 0:
+            keyboard.append(row)
+            row = []
+        counter += 1
+    return keyboard
 
 
 def category_message_text(category=None):
@@ -279,9 +325,14 @@ def category_message_text(category=None):
 Выбери категорию, которая наиболее точно подходит тебе. 
 Правильно выбранная категория поможет покупателю быстрее найти товар. 
 
-➡️ Категории *Велосипеды, Компоненты, Колеса и покрышки, Обслуживание, Аксессуары, Сумки* имеют подкатегории. 
+👉🏻👉🏻 Категории *Велосипеды, Компоненты, Колеса и покрышки, Обслуживание, Аксессуары, Сумки* имеют подкатегории. 
+
+🤙🏻🤙🏻 Подкатегории *Рулевое управление, Седла и штыри, Педали и шипы, Трансмиссия* имеют подкатегории. 
+
 *Одежда* - джерси, бибы, кепки, рукава, носки, перчатки, куртки, бафы. 
+
 *Обувь* - велотуфли, бахилы. 
+
 *Шлемы* - шлемы, визоры.
 """
     if category:
@@ -308,6 +359,7 @@ def save_current_state(update, state):
     if update.effective_chat.id not in CHATS_DICT:
         CHATS_DICT[update.effective_chat.id] = Chat(update.effective_chat.id)
     CHATS_DICT[update.effective_chat.id].user_state = state
+    return state
 
 
 def get_current_state(update):
@@ -328,31 +380,47 @@ def save_photo_message(update):
     CHATS_DICT[update.effective_chat.id].photo_message = update.effective_message
 
 
+def send_message(update, context, message_text, reply_markup=None):
+    return context.bot.send_message(chat_id=update.effective_chat.id,
+                                    text=message_text,
+                                    parse_mode=telegram.ParseMode.MARKDOWN,
+                                    reply_markup=reply_markup)
+
+
 def delete_prev_message(update, context):
     if update.effective_chat.id not in CHATS_DICT:
         return
     message_id = CHATS_DICT[update.effective_chat.id].prev_message_id
-    context.bot.delete_message(chat_id=update.effective_chat.id, message_id=message_id)
+    try:
+        context.bot.delete_message(chat_id=update.effective_chat.id, message_id=message_id)
+    except telegram.error.TelegramError as e:
+        _LOGGER.warning(e)
 
 
 def delete_prev_keyboard(update, context):
     if update.effective_chat.id not in CHATS_DICT:
         return
     message_id = CHATS_DICT[update.effective_chat.id].prev_message_id
-    context.bot.edit_message_reply_markup(chat_id=update.effective_chat.id,
-                                          reply_markup=None, message_id=message_id)
+    try:
+        context.bot.edit_message_reply_markup(chat_id=update.effective_chat.id,
+                                              reply_markup=None, message_id=message_id)
+    except telegram.error.TelegramError as e:
+        _LOGGER.warning(e)
 
 
 def edit_prev_keyboard(update, context, reply_markup):
     if update.effective_chat.id not in CHATS_DICT:
         return
     message_id = CHATS_DICT[update.effective_chat.id].prev_message_id
-    context.bot.edit_message_reply_markup(chat_id=update.effective_chat.id,
-                                          reply_markup=reply_markup, message_id=message_id)
+    try:
+        context.bot.edit_message_reply_markup(chat_id=update.effective_chat.id,
+                                              reply_markup=reply_markup, message_id=message_id)
+    except telegram.error.TelegramError as e:
+        _LOGGER.warning(e)
 
 
 def post_item_command_handler(update, context):
-    message_text = "⬇️⬇️⬇ ️жми кнопку ⬇️⬇️⬇️"
+    message_text = "⬇️⬇️⬇  ⬇️⬇️⬇️"
     keyboard = [[InlineKeyboardButton(CallbackDataEnum.POSTITEM.value, callback_data=CallbackDataEnum.POSTITEM.name)]]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
@@ -394,9 +462,7 @@ def post_item_handler(update, context, keyboard_only=False):
     else:
         edit_prev_keyboard(update, context, reply_markup)
 
-    save_current_state(update, UserState.WAITING_FOR_CATEGORY)
-
-    return UserState.WAITING_FOR_CATEGORY
+    return save_current_state(update, UserState.WAITING_FOR_CATEGORY)
 
 
 def post_item_category(update, context, category):
@@ -404,37 +470,70 @@ def post_item_category(update, context, category):
         return ConversationHandler.END
 
     if category == CategoryEnum.BICYCLE:
-        return post_item_bicycle_category(update, context, category)
+        return post_item_bicycle_category(update, context)
+    if category == CategoryEnum.COMPONENTS:
+        return post_item_component_category(update, context)
+    if category == CategoryEnum.ACCESSORIES:
+        return post_item_show_subcategory(update, context, AccessoriesCategoryEnum, UserState.WAITING_FOR_ACCESSORIES)
+    if category == CategoryEnum.WHEELS:
+        return post_item_show_subcategory(update, context, WheelsCategoryEnum, UserState.WAITING_FOR_WHEELS)
+    if category == CategoryEnum.BAGS:
+        return post_item_show_subcategory(update, context, BagsCategoryEnum, UserState.WAITING_FOR_BAGS)
+    if category == CategoryEnum.SERVICE:
+        return post_item_show_subcategory(update, context, ServiceCategoryEnum, UserState.WAITING_FOR_SERVICE)
+
+    delete_prev_keyboard(update, context)
 
     if category == CategoryEnum.CLOTHES:
-        return post_item_pre_photo(update, context)
+        return post_item_pre_photo(update, context, category)
     if category == CategoryEnum.SHOES:
-        return post_item_pre_photo(update, context)
+        return post_item_pre_photo(update, context, category)
     if category == CategoryEnum.HELMETS:
-        return post_item_pre_photo(update, context)
+        return post_item_pre_photo(update, context, category)
 
 
-def post_item_bicycle_category(update, context, category):
+def post_item_bicycle_category(update, context):
     keyboard = [
-        [InlineKeyboardButton(BicycleCategoryEnum.ROAD.value, callback_data=BicycleCategoryEnum.ROAD.name),
-         InlineKeyboardButton(BicycleCategoryEnum.FIX.value, callback_data=BicycleCategoryEnum.FIX.name)],
+        [get_button_for_enum(BicycleCategoryEnum.ROAD), get_button_for_enum(BicycleCategoryEnum.FIX)],
+        [get_button_for_enum(BicycleCategoryEnum.CYCLOCROSS), get_button_for_enum(BicycleCategoryEnum.SINGLE)],
 
-        [InlineKeyboardButton(BicycleCategoryEnum.CYCLOCROSS.value, callback_data=BicycleCategoryEnum.CYCLOCROSS.name),
-         InlineKeyboardButton(BicycleCategoryEnum.SINGLE.value, callback_data=BicycleCategoryEnum.SINGLE.name)],
+        [get_button_for_enum(BicycleCategoryEnum.GRAVEL), get_button_for_enum(BicycleCategoryEnum.TOURING)],
 
-        [InlineKeyboardButton(BicycleCategoryEnum.GRAVEL.value, callback_data=BicycleCategoryEnum.GRAVEL.name),
-         InlineKeyboardButton(BicycleCategoryEnum.TOURING.value, callback_data=BicycleCategoryEnum.TOURING.name)],
-
-        [InlineKeyboardButton(CallbackDataEnum.BACK.value, callback_data=CallbackDataEnum.BACK.name)]
+        [get_button_for_enum(CallbackDataEnum.BACK)],
     ]
 
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     edit_prev_keyboard(update, context, reply_markup)
 
-    save_current_state(update, UserState.WAITING_FOR_BICYCLE)
+    return save_current_state(update, UserState.WAITING_FOR_BICYCLE)
 
-    return UserState.WAITING_FOR_BICYCLE
+
+def post_item_component_category(update, context):
+    keyboard = [
+        [get_button_for_enum(ComponentCategoryEnum.FRAME), get_button_for_enum(ComponentCategoryEnum.FORK)],
+        [get_button_for_enum(ComponentCategoryEnum.BRAKES), get_button_for_enum(ComponentCategoryEnum.STEERING)],
+
+        [get_button_for_enum(ComponentCategoryEnum.SEATING),
+         get_button_for_enum(ComponentCategoryEnum.TRANSMISSION),
+         get_button_for_enum(ComponentCategoryEnum.PEDALS)],
+
+        [get_button_for_enum(CallbackDataEnum.BACK)],
+    ]
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    edit_prev_keyboard(update, context, reply_markup)
+
+    return save_current_state(update, UserState.WAITING_FOR_COMPONENT)
+
+
+def post_item_show_subcategory(update, context, category_enum, state):
+    keyboard = keyboard_for_enum(category_enum)
+    keyboard.append([get_button_for_enum(CallbackDataEnum.BACK)])
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    edit_prev_keyboard(update, context, reply_markup)
+    return save_current_state(update, state)
 
 
 def post_item_go_back(update, context):
@@ -442,18 +541,102 @@ def post_item_go_back(update, context):
 
     new_state = ConversationHandler.END
 
-    if state == UserState.WAITING_FOR_BICYCLE:
+    if state in (UserState.WAITING_FOR_BICYCLE,
+                 UserState.WAITING_FOR_COMPONENT,
+                 UserState.WAITING_FOR_WHEELS,
+                 UserState.WAITING_FOR_BAGS,
+                 UserState.WAITING_FOR_ACCESSORIES,
+                 UserState.WAITING_FOR_SERVICE):
         return post_item_handler(update, context, keyboard_only=True)
+
+    if state in (UserState.WAITING_FOR_SEATING,
+                 UserState.WAITING_FOR_STEERING,
+                 UserState.WAITING_FOR_PEDALS):
+        return post_item_component_category(update, context)
 
     return new_state
 
 
-def post_item_process_bicycle(update, context, category):
-    message_text = photo_message_text()
-    message_text = "Ты выбрал {}\n{}".format(category.value, message_text)
+def post_item_seating_category(update, context):
+    keyboard = [
+        [get_button_for_enum(SeatingCategoryEnum.SADDLES),
+         get_button_for_enum(SeatingCategoryEnum.SEATPOST),
+         get_button_for_enum(SeatingCategoryEnum.ZAZHIM)],
 
-    # save chosen bicycle category to dictionary
-    CHATS_DICT[update.effective_chat.id].choosen_category = category
+        [get_button_for_enum(CallbackDataEnum.BACK)],
+    ]
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    edit_prev_keyboard(update, context, reply_markup)
+
+    return save_current_state(update, UserState.WAITING_FOR_SEATING)
+
+
+def post_item_pedals_category(update, context):
+    keyboard = [
+        [get_button_for_enum(PedalsCategoryEnum.PEDALS), get_button_for_enum(PedalsCategoryEnum.CLEATS)],
+        [get_button_for_enum(PedalsCategoryEnum.STRAPS), get_button_for_enum(PedalsCategoryEnum.TOECLIP)],
+
+        [get_button_for_enum(CallbackDataEnum.BACK)],
+    ]
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    edit_prev_keyboard(update, context, reply_markup)
+
+    return save_current_state(update, UserState.WAITING_FOR_PEDALS)
+
+
+def post_item_steering_category(update, context):
+    keyboard = [
+        [get_button_for_enum(SteeringCategoryEnum.HANDLEBARS), get_button_for_enum(SteeringCategoryEnum.STEMS)],
+        [get_button_for_enum(SteeringCategoryEnum.HEADSETS), get_button_for_enum(SteeringCategoryEnum.TOPCAPS)],
+
+        [get_button_for_enum(SteeringCategoryEnum.SPACERS),
+         get_button_for_enum(SteeringCategoryEnum.BARTAPES),
+         get_button_for_enum(SteeringCategoryEnum.GRIPS)],
+
+        [get_button_for_enum(CallbackDataEnum.BACK)],
+    ]
+
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    edit_prev_keyboard(update, context, reply_markup)
+
+    return save_current_state(update, UserState.WAITING_FOR_STEERING)
+
+
+def post_item_process_subcategory(update, context, category):
+    delete_prev_keyboard(update, context)
+
+    if isinstance(category, ComponentCategoryEnum):
+        get_chat(update).category_dict[0] = CategoryEnum.COMPONENTS
+        get_chat(update).category_dict[1] = category
+        if category == ComponentCategoryEnum.SEATING:
+            return post_item_seating_category(update, context)
+        if category == ComponentCategoryEnum.PEDALS:
+            return post_item_pedals_category(update, context)
+        if category == ComponentCategoryEnum.STEERING:
+            return post_item_steering_category(update, context)
+
+    if isinstance(category, SeatingCategoryEnum):
+        get_chat(update).category_dict[0] = CategoryEnum.COMPONENTS
+        get_chat(update).category_dict[1] = ComponentCategoryEnum.SEATING
+        get_chat(update).category_dict[2] = category
+    if isinstance(category, PedalsCategoryEnum):
+        get_chat(update).category_dict[0] = CategoryEnum.COMPONENTS
+        get_chat(update).category_dict[1] = ComponentCategoryEnum.PEDALS
+        get_chat(update).category_dict[2] = category
+    if isinstance(category, SteeringCategoryEnum):
+        get_chat(update).category_dict[0] = CategoryEnum.COMPONENTS
+        get_chat(update).category_dict[1] = ComponentCategoryEnum.STEERING
+        get_chat(update).category_dict[2] = category
+
+    message_text = photo_message_text()
+
+    category_string = get_chat(update).get_full_category_string()
+    message_text = "*{}*\n{}".format(category_string, message_text)
 
     message = context.bot.send_message(chat_id=update.effective_chat.id,
                                        text=message_text,
@@ -461,18 +644,19 @@ def post_item_process_bicycle(update, context, category):
 
     save_message_id(update, message)
 
-    return post_item_pre_photo(update, context)
+    return save_current_state(update, UserState.WAITING_FOR_PHOTO)
 
 
-def post_item_pre_photo(update, context):
+def post_item_pre_photo(update, context, category):
+    get_chat(update).category_dict[0] = category
+
     message_text = photo_message_text()
-    delete_prev_keyboard(update, context)
     message = context.bot.send_message(chat_id=update.effective_chat.id,
                                        text=message_text, parse_mode=telegram.ParseMode.MARKDOWN)
 
     save_message_id(update, message)
 
-    return UserState.WAITING_FOR_PHOTO
+    return save_current_state(update, UserState.WAITING_FOR_PHOTO)
 
 
 def post_item_process_photo(update, context):
@@ -506,7 +690,12 @@ def post_item_process_currency(update, context, currency):
 
 def post_item_process_price(update, context):
     price = update.effective_message.text
-    get_chat(update).price = price
+
+    if not REGEXP_ONLY_DIGITS.match(price):
+        send_message(update, context, "Я приму лишь цифры в цене, давай еще разок...")
+        return UserState.WAITING_FOR_PRICE
+
+    get_chat(update).price = int(price)
 
     message_text = """ Укажи дружишь ли ты с доставкой данного товара"""
 
@@ -521,6 +710,8 @@ def post_item_process_price(update, context):
     save_message_id(update, message)
 
     return UserState.WAITING_FOR_SHIP
+
+
 
 
 def post_item_process_ship(update, context, ship):
@@ -607,25 +798,36 @@ def post_item_process_caption(update, context):
 
 
 def build_product_text(update):
+
     if update.effective_user.username:
         seller_name = update.effective_user.username
     else:
         seller_name = update.effective_user.full_name
 
-    seller = "[{name}](tg://user?id={id})".format(id=update.effective_user.id, name=seller_name)
+    seller = '<a href="tg://user?id={id}">{name}</a>'.format(id=update.effective_user.id, name=seller_name)
 
     chat = get_chat(update)
-    text = "*Наименование:* {caption}\n\n" \
-           "*Описание:* {descr}\n\n" \
-           "*Город:* {city}\n\n" \
-           "*Цена:* {price} {currency}\n\n" \
-           "*Продавец:* {seller}".format(
-            caption=chat.caption,
-            descr=chat.description,
+
+    category_string = chat.get_full_category_string()
+    hashtags = chat.get_hashtags()
+
+    text = "<b>{category_string}</b>\n" \
+           "{hashtags}\n\n" \
+           "<b>Наименование:</b> {caption}\n\n" \
+           "<b>Описание:</b> {descr}\n\n" \
+           "<b>Город:</b> {city}\n\n" \
+           "<b>Цена:</b> {price} {currency}\n\n" \
+           "<b>Продавец:</b> {seller}".format(
+            category_string=category_string,
+            hashtags=hashtags,
+            caption=html.escape(chat.caption),
+            descr=html.escape(chat.description),
             city=chat.city.title,
             price=chat.price,
             currency=chat.currency.value,
             seller=seller)
+
+    # text = html.escape(text)
 
     return text
 
@@ -643,7 +845,7 @@ def post_item_process_description(update, context):
     context.bot.send_photo(chat_id=chat.chat_id,
                            photo=chat.photo_message.photo[-1].file_id,
                            caption=text,
-                           parse_mode=telegram.ParseMode.MARKDOWN_V2)
+                           parse_mode=telegram.ParseMode.HTML)
 
     keyboard = [
         [InlineKeyboardButton(CallbackDataEnum.DONE.value, callback_data=CallbackDataEnum.DONE.name),
@@ -651,30 +853,36 @@ def post_item_process_description(update, context):
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     message_text = \
-        "Нажмите {done} для постинга на канал @{channel} или {cancel} для отмены.".format(
+        "Нажми *{done}* для постинга на канал @{channel} или *{cancel}* для отмены.".format(
             done=CallbackDataEnum.DONE.value,
             cancel=CallbackDataEnum.CANCEL.value,
             channel=_CHANNEL)
-    send_message(update, context, message_text, reply_markup)
+    message = send_message(update, context, message_text, reply_markup)
+    save_message_id(update, message)
 
     return UserState.WAITING_FOR_APPROVE
 
 
 def post_item_process_approve(update, context):
+    delete_prev_keyboard(update, context)
+
     chat = get_chat(update)
     text = build_product_text(update)
     context.bot.send_photo(chat_id='@' + _CHANNEL,
                            photo=chat.photo_message.photo[-1].file_id,
                            caption=text,
-                           parse_mode=telegram.ParseMode.MARKDOWN_V2)
+                           parse_mode=telegram.ParseMode.HTML)
 
-    message_text = "Товар размещен на канале @{}.".format(_CHANNEL)
+    # TODO: add link to post
+    message_text = "Товар размещен на канале @{}.\nЕсли захочется повторить жми /postitem".format(_CHANNEL)
     send_message(update, context, message_text)
 
     return ConversationHandler.END
 
 
 def cancel_handler(update, context):
+    delete_prev_keyboard(update, context)
+    send_message(update, context, "Всё, проехали...\nЕсли захочется повторить жми /postitem")
     return ConversationHandler.END
 
 
@@ -723,9 +931,25 @@ if __name__ == "__main__":
 
     back_handler = CallbackQueryHandler(post_item_go_back, pattern='^' + CallbackDataEnum.BACK.name + '$')
 
-    waiting_for_bicycle_h = [CallbackQueryHandler(partial(post_item_process_bicycle, category=x),
-                                                  pattern='^' + x.name + '$') for x in BicycleCategoryEnum]
-    waiting_for_bicycle_h.append(back_handler)
+    def do_shit(enum):
+        handlers = [
+            CallbackQueryHandler(
+                partial(post_item_process_subcategory, category=x),
+                pattern='^' + x.name + '$') for x in enum]
+        handlers.append(back_handler)
+        return handlers
+
+    waiting_for_bicycle_h = do_shit(BicycleCategoryEnum)
+
+    waiting_for_component_h = do_shit(ComponentCategoryEnum)
+    waiting_for_seating_h = do_shit(SeatingCategoryEnum)
+    waiting_for_steering_h = do_shit(SteeringCategoryEnum)
+    waiting_for_pedals_h = do_shit(PedalsCategoryEnum)
+
+    waiting_for_accessories_h = do_shit(AccessoriesCategoryEnum)
+    waiting_for_bags_h = do_shit(BagsCategoryEnum)
+    waiting_for_wheels_h = do_shit(WheelsCategoryEnum)
+    waiting_for_service_h = do_shit(ServiceCategoryEnum)
 
     top_cities = get_top_cities()
 
@@ -737,27 +961,47 @@ if __name__ == "__main__":
                 UserState.WAITING_FOR_CATEGORY:
                     [CallbackQueryHandler(partial(post_item_category, category=x),
                                           pattern='^' + x.name + '$') for x in CategoryEnum],
+
                 UserState.WAITING_FOR_BICYCLE: waiting_for_bicycle_h,
+                UserState.WAITING_FOR_COMPONENT: waiting_for_component_h,
+
+                UserState.WAITING_FOR_SEATING: waiting_for_seating_h,
+                UserState.WAITING_FOR_STEERING: waiting_for_steering_h,
+                UserState.WAITING_FOR_PEDALS: waiting_for_pedals_h,
+
+                UserState.WAITING_FOR_WHEELS: waiting_for_wheels_h,
+                UserState.WAITING_FOR_ACCESSORIES: waiting_for_accessories_h,
+                UserState.WAITING_FOR_BAGS: waiting_for_bags_h,
+                UserState.WAITING_FOR_SERVICE: waiting_for_service_h,
+
                 UserState.WAITING_FOR_PHOTO: [MessageHandler(
                     callback=post_item_process_photo, filters=Filters.photo)],
+
                 UserState.WAITING_FOR_CURRENCY:
                     [CallbackQueryHandler(partial(post_item_process_currency, currency=x),
                                           pattern='^' + x.name + '$') for x in CurrencyEnum],
+
                 UserState.WAITING_FOR_PRICE: [MessageHandler(
                     callback=post_item_process_price, filters=Filters.text)],
+
                 UserState.WAITING_FOR_SHIP:
                     [CallbackQueryHandler(partial(post_item_process_ship, ship=x),
                                           pattern='^' + x.name + '$') for x in ShippingEnum],
+
                 UserState.WAITING_FOR_CITY:
                     [CallbackQueryHandler(partial(post_item_process_city, city=x),
                                           pattern='^' + CallbackDataEnum.CITY.name + str(x.id) + '$') for x in
                      top_cities],
+
                 UserState.WAITING_FOR_CAPTION: [MessageHandler(
                     callback=post_item_process_caption, filters=Filters.text)],
+
                 UserState.WAITING_FOR_DESCRIPTION: [MessageHandler(
                     callback=post_item_process_description, filters=Filters.text)],
+
                 UserState.WAITING_FOR_APPROVE:
-                    [CallbackQueryHandler(post_item_process_approve, pattern='^' + CallbackDataEnum.DONE.name + '$')]
+                    [CallbackQueryHandler(post_item_process_approve, pattern='^' + CallbackDataEnum.DONE.name + '$'),
+                     CallbackQueryHandler(cancel_handler, pattern='^' + CallbackDataEnum.CANCEL.name + '$')]
             },
             fallbacks=[CommandHandler('cancel', cancel_handler)],
             per_message=False)
