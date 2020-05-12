@@ -120,9 +120,9 @@ def remove_album_handler(update, context):
 
 
 class Chat:
-    def __init__(self, chat_id):
+    def __init__(self, chat_id, user_id):
         self.chat_id = chat_id
-        self.user_id = None
+        self.user_id = user_id
         self.prev_message_id = None
         self.user_state = None
 
@@ -166,6 +166,7 @@ class Chat:
         city_hashtag = city_hashtag.replace(' ', '_')
         city_hashtag = city_hashtag.replace('-', '_')
         hashtags += "#" + city_hashtag + " "
+        hashtags += "#user" + str(self.user_id) + " "
         for c in self.category_dict.items():
             if c[1] is not None:
                 hashtags += "#" + c[1].name.lower() + " "
@@ -446,7 +447,7 @@ def get_chat(update):
 
 def save_current_state(update, state):
     if update.effective_chat.id not in CHATS_DICT:
-        CHATS_DICT[update.effective_chat.id] = Chat(update.effective_chat.id)
+        CHATS_DICT[update.effective_chat.id] = Chat(update.effective_chat.id, update.effective_user.id)
     CHATS_DICT[update.effective_chat.id].user_state = state
     return state
 
@@ -459,13 +460,13 @@ def get_current_state(update):
 
 def save_message_id(update, message):
     if update.effective_chat.id not in CHATS_DICT:
-        CHATS_DICT[update.effective_chat.id] = Chat(update.effective_chat.id)
+        CHATS_DICT[update.effective_chat.id] = Chat(update.effective_chat.id, update.effective_user.id)
     CHATS_DICT[update.effective_chat.id].prev_message_id = message.message_id
 
 
 def save_photo_message(update):
     if update.effective_chat.id not in CHATS_DICT:
-        CHATS_DICT[update.effective_chat.id] = Chat(update.effective_chat.id)
+        CHATS_DICT[update.effective_chat.id] = Chat(update.effective_chat.id, update.effective_user.id)
     CHATS_DICT[update.effective_chat.id].photo_message = update.effective_message
 
 
@@ -898,12 +899,6 @@ def post_item_process_caption(update, context):
     if caption == '/cancel':
         return ConversationHandler.END
 
-    # if update.effective_user.username:
-    #     description = "@" + update.effective_user.username + "\n" + description
-
-    # get photo for this user and send photo+desc to channel
-    # ACTIVE_USERS[update.effective_user]["description"] = description
-
     CHATS_DICT[update.effective_chat.id].caption = caption
 
     message_text = """➕ *Описание.*
@@ -936,14 +931,14 @@ def build_product_text(update):
            "<b>Город:</b> {city}\n\n" \
            "<b>Цена:</b> {price} {currency}\n\n" \
            "<b>Продавец:</b> {seller}".format(
-            category_string=category_string,
-            hashtags=hashtags,
-            caption=html.escape(chat.caption),
-            descr=html.escape(chat.description),
-            city=chat.city.title,
-            price=chat.price,
-            currency=chat.currency.value,
-            seller=seller)
+        category_string=category_string,
+        hashtags=hashtags,
+        caption=html.escape(chat.caption),
+        descr=html.escape(chat.description),
+        city=chat.city.title,
+        price=chat.price,
+        currency=chat.currency.value,
+        seller=seller)
 
     # text = html.escape(text)
 
@@ -981,20 +976,30 @@ def post_item_process_description(update, context):
     return UserState.WAITING_FOR_APPROVE
 
 
+class TelegramGood:
+    def __init__(self, tg_user_id):
+        self.tg_user_id = tg_user_id
+
+
 def post_item_process_approve(update, context):
     delete_prev_keyboard(update, context)
 
     chat = get_chat(update)
     text = build_product_text(update)
-    context.bot.send_photo(chat_id='@' + _CHANNEL,
-                           photo=chat.photo_message.photo[-1].file_id,
-                           caption=text,
-                           parse_mode=telegram.ParseMode.HTML)
+    message = context.bot.send_photo(chat_id='@' + _CHANNEL,
+                                     photo=chat.photo_message.photo[-1].file_id,
+                                     caption=text,
+                                     parse_mode=telegram.ParseMode.HTML)
+
+    # TODO: database save seller and good
 
     chat.clean()
 
     # TODO: add link to post
-    message_text = "Товар размещен на канале @{}.\nЕсли захочется повторить жми /postitem".format(_CHANNEL)
+    message_text = \
+        "Товар размещен на канале @{channel}, ссылка на пост: https://t.me/{channel}/{message_id}.\n\n" \
+        "Если захочется повторить жми /postitem".format(
+            channel=_CHANNEL, message_id=message.message_id)
     send_message(update, context, message_text)
 
     return ConversationHandler.END
