@@ -391,6 +391,36 @@ def keyboard_for_countries(columns=2):
     return keyboard
 
 
+def keyboard_for_cities(cities, columns=2, callback_data_prefix=CallbackDataEnum.CITY.name):
+    keyboard = []
+    counter = 1
+    row = []
+    titles_set = set()
+    same_titles = []
+    for c in cities:
+        if c.title in titles_set:
+            same_titles.append(c.title)
+        titles_set.add(c.title)
+
+    for c in cities:
+        if c.title in same_titles:
+            keyboard_text = c.title
+            if c.area:
+                keyboard_text += " (" + c.area + ")"
+        else:
+            keyboard_text = c.title
+        row.append(InlineKeyboardButton(keyboard_text, callback_data=callback_data_prefix + str(c.id)))
+        if counter % columns == 0:
+            keyboard.append(row)
+            row = []
+        counter += 1
+
+    if row:
+        keyboard.append(row)
+
+    return keyboard
+
+
 def keyboard_for_enum(enum, columns=2):
     keyboard = []
     counter = 1
@@ -757,31 +787,6 @@ def post_item_process_price(update, context):
     return UserState.WAITING_FOR_SHIP
 
 
-def keyboard_for_cities(cities, columns=2, callback_data_prefix=CallbackDataEnum.CITY.name):
-    keyboard = []
-    counter = 1
-    row = []
-    titles_set = set()
-    same_titles = []
-    for c in cities:
-        if c.title in titles_set:
-            same_titles.append(c.title)
-        titles_set.add(c.title)
-
-    for c in cities:
-        if c.title in same_titles:
-            keyboard_text = c.title
-            if c.area:
-                keyboard_text += " (" + c.area + ")"
-        else:
-            keyboard_text = c.title
-        row.append(InlineKeyboardButton(keyboard_text, callback_data=callback_data_prefix + str(c.id)))
-        if counter % columns == 0:
-            keyboard.append(row)
-            row = []
-        counter += 1
-
-    return keyboard
 
 
 def post_item_process_ship(update, context, ship):
