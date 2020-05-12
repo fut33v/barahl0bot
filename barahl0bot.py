@@ -12,6 +12,8 @@ from telegram import InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import Updater, CommandHandler, ConversationHandler, MessageHandler, Filters, CallbackQueryHandler
 from vk_api.exceptions import ApiError
 
+from anytree import Node, RenderTree
+
 from database import Barahl0botDatabase
 from settings import Barahl0botSettings
 from structures import Album, City
@@ -135,6 +137,21 @@ class Chat:
         self.caption = None
         self.description = None
 
+    def clean(self):
+        self.prev_message_id = None
+        self.user_state = None
+
+        self.category_dict = {0: None, 1: None, 2: None}
+
+        self.photo_message = None
+        self.currency = None
+        self.price = None
+        self.ship = None
+        self.city = None
+        self.country = None
+        self.caption = None
+        self.description = None
+
     def get_full_category_string(self):
         category_string = ""
         for c in self.category_dict.items():
@@ -188,18 +205,18 @@ class UserState(Enum):
 
 
 class CategoryEnum(Enum):
-    BICYCLE = "Велосипед"
+    BIKES = "Велосипед"
     BIKEPARTS = "Компоненты"
     WHEELSNTYRES = "Колеса и покрышки"
     MAINTENANCE = "Обслуживание"
     ACCESSORIES = "Аксессуары"
-    CLOTHES = "Одежда"
+    BAGS = "Сумки"
+    CLOTHING = "Одежда"
     FOOTWEAR = "Обувь"
     HELMETS = "Шлемы"
-    BAGS = "Сумки"
 
 
-class BicycleCategoryEnum(Enum):
+class BikesCategoryEnum(Enum):
     ROAD = "Шоссер"
     CYCLOCROSS = "Циклокросс"
     FIX = "Фикс"
@@ -209,26 +226,27 @@ class BicycleCategoryEnum(Enum):
 
 
 class BikepartsCategoryEnum(Enum):
-    FRAME = "Рама"
-    FORK = "Вилка"
+    FRAMES = "Рама"
+    FORKS = "Вилка"
     BRAKES = "Тормоза"
     STEERING = "Рулевое управление"
     SEATING = "Седла и штыри"
     DRIVETRAIN = "Трансмиссия"
-    PEDALS = "Педали и шипы"
+    PEDALSNCLEATS = "Педали и шипы"
 
 
 class SeatingCategoryEnum(Enum):
     SADDLES = "Седла"
     SEATPOSTS = "Подседел"
-    SEATCLAMPS = "Зажим"
+    CLAMPS = "Зажим"
 
 
-class PedalsCategoryEnum(Enum):
+class PedalsNCleatsCategoryEnum(Enum):
     PEDALS = "Педали"
     CLEATS = "Шипы"
     STRAPS = "Стрепы"
-    TOECLIP = "Туклипсы"
+    TOECLIPS = "Туклипсы"
+    CLEATCOVERS = "Бахилы"
 
 
 class SteeringCategoryEnum(Enum):
@@ -247,19 +265,26 @@ class DrivetrainCategoryEnum(Enum):
     CHAINS = "Цепи"
     BOTTOMBRACKETS = "Каретки"
     CHAINRINGS = "Звезды (перед)"
-    FRONT_DERAILLEURS = "Перед. переклюк"
+    FRONTDERAILLEURS = "Перед. переклюк"
     CASSETES = "Кассеты"
     FREEHUBS = "Барабаны"
-    REAR_DERAILLEURS = "Зад. переклюк"
-    SHIFTERS = "Шифтеры"
-    DERAILLEUR_HANGERS = "Петухи"
-    CABLES = "Тросики"
+    REARDERAILLEURS = "Зад. переклюк"
+    GEARLEVERS = "Шифтеры"
+    MECHHANGERS = "Петухи"
+    GEARCABLES = "Тросики"
 
 
-class WheelsCategoryEnum(Enum):
+class BrakesCategoryEnum(Enum):
+    RIMBRAKES = "Ободные тормоза"
+    DISCBRAKES = "Дисковые тормоза"
+    BRAKELEVERS = "Ручки"
+    BRAKECABLES = "Тросики"
+
+
+class WheelsNTyresCategoryEnum(Enum):
     WHEELS = "Колеса"
     HUBS = "Втулки"
-    TIRES = "Покрышки"
+    TYRES = "Покрышки"
     RIMS = "Обода"
     TUBES = "Камеры"
     SPOKES = "Спицы"
@@ -273,22 +298,24 @@ class MaintenanceCategoryEnum(Enum):
 
 class AccessoriesCategoryEnum(Enum):
     GLASSES = "Очки"
-    LOCK = "Замки"
-    LIGHT = "Фонари"
-    BOTTLE = "Фляги и флягодержатели"
+    LOCKS = "Замки"
+    LIGHTS = "Фонари"
+    BOTTLES = "Фляги"
+    BOTTLECAGES = "Флягодержатели"
     COMPUTERS = "Велокомпы"
-    MUDGUARD = "Крылья"
-    RACK = "Багажники"
-    TRAINER = "Станки"
+    MUDGUARDS = "Крылья"
+    RACKS = "Багажники"
+    TRAINERS = "Станки"
 
 
 class BagsCategoryEnum(Enum):
-    CASE = "Чехлы и боксы"
+    BIKEBAGS = "Чехлы"
+    FRAMEBAGS = "Боксы"
     BAUL = "Баулы"
-    ROLLTOP = "Роллтопы"
-    MESSENGER = "Мессенджеры"
-    STEERING_BAG = "Нарульные сумки"
-    WAIST_BAG = "Поясные сумки"
+    ROLLTOPS = "Роллтопы"
+    MESSENGERS = "Мессенджеры"
+    HANDLEBARBAGS = "Нарульные сумки"
+    WAISTBAGS = "Поясные сумки"
 
 
 class PhotoOrAlbumEnum(Enum):
@@ -499,7 +526,7 @@ def post_item_handler(update, context, keyboard_only=False):
     message_text = category_message_text()
 
     keyboard = [
-        [InlineKeyboardButton(CategoryEnum.BICYCLE.value, callback_data=CategoryEnum.BICYCLE.name),
+        [InlineKeyboardButton(CategoryEnum.BIKES.value, callback_data=CategoryEnum.BIKES.name),
          InlineKeyboardButton(CategoryEnum.BIKEPARTS.value, callback_data=CategoryEnum.BIKEPARTS.name)],
 
         [InlineKeyboardButton(CategoryEnum.WHEELSNTYRES.value, callback_data=CategoryEnum.WHEELSNTYRES.name),
@@ -508,7 +535,7 @@ def post_item_handler(update, context, keyboard_only=False):
         [InlineKeyboardButton(CategoryEnum.ACCESSORIES.value, callback_data=CategoryEnum.ACCESSORIES.name),
          InlineKeyboardButton(CategoryEnum.BAGS.value, callback_data=CategoryEnum.BAGS.name)],
 
-        [InlineKeyboardButton(CategoryEnum.CLOTHES.value, callback_data=CategoryEnum.CLOTHES.name),
+        [InlineKeyboardButton(CategoryEnum.CLOTHING.value, callback_data=CategoryEnum.CLOTHING.name),
          InlineKeyboardButton(CategoryEnum.FOOTWEAR.value, callback_data=CategoryEnum.FOOTWEAR.name),
          InlineKeyboardButton(CategoryEnum.HELMETS.value, callback_data=CategoryEnum.HELMETS.name)]]
 
@@ -532,14 +559,14 @@ def post_item_category(update, context, category):
     if not isinstance(category, CategoryEnum):
         return ConversationHandler.END
 
-    if category == CategoryEnum.BICYCLE:
-        return post_item_show_subcategory(update, context, BicycleCategoryEnum, UserState.WAITING_FOR_BICYCLE)
+    if category == CategoryEnum.BIKES:
+        return post_item_show_subcategory(update, context, BikesCategoryEnum, UserState.WAITING_FOR_BICYCLE)
     if category == CategoryEnum.BIKEPARTS:
         return post_item_show_subcategory(update, context, BikepartsCategoryEnum, UserState.WAITING_FOR_BIKEPARTS)
     if category == CategoryEnum.ACCESSORIES:
         return post_item_show_subcategory(update, context, AccessoriesCategoryEnum, UserState.WAITING_FOR_ACCESSORIES)
     if category == CategoryEnum.WHEELSNTYRES:
-        return post_item_show_subcategory(update, context, WheelsCategoryEnum, UserState.WAITING_FOR_WHEELS)
+        return post_item_show_subcategory(update, context, WheelsNTyresCategoryEnum, UserState.WAITING_FOR_WHEELS)
     if category == CategoryEnum.BAGS:
         return post_item_show_subcategory(update, context, BagsCategoryEnum, UserState.WAITING_FOR_BAGS)
     if category == CategoryEnum.MAINTENANCE:
@@ -547,7 +574,7 @@ def post_item_category(update, context, category):
 
     delete_prev_keyboard(update, context)
 
-    if category == CategoryEnum.CLOTHES:
+    if category == CategoryEnum.CLOTHING:
         get_chat(update).category_dict[0] = category
         return post_item_pre_photo(update, context, category)
     if category == CategoryEnum.FOOTWEAR:
@@ -592,10 +619,13 @@ def post_item_go_back(update, context):
 
 
 def update_chat_category_dict(update, category):
-    if isinstance(category, BicycleCategoryEnum):
-        get_chat(update).category_dict[0] = CategoryEnum.BICYCLE
+    if isinstance(category, BikesCategoryEnum):
+        get_chat(update).category_dict[0] = CategoryEnum.BIKES
         get_chat(update).category_dict[1] = category
-    if isinstance(category, WheelsCategoryEnum):
+    if isinstance(category, BikepartsCategoryEnum):
+        get_chat(update).category_dict[0] = CategoryEnum.BIKEPARTS
+        get_chat(update).category_dict[1] = category
+    if isinstance(category, WheelsNTyresCategoryEnum):
         get_chat(update).category_dict[0] = CategoryEnum.WHEELSNTYRES
         get_chat(update).category_dict[1] = category
     if isinstance(category, AccessoriesCategoryEnum):
@@ -612,9 +642,9 @@ def update_chat_category_dict(update, category):
         get_chat(update).category_dict[0] = CategoryEnum.BIKEPARTS
         get_chat(update).category_dict[1] = BikepartsCategoryEnum.SEATING
         get_chat(update).category_dict[2] = category
-    if isinstance(category, PedalsCategoryEnum):
+    if isinstance(category, PedalsNCleatsCategoryEnum):
         get_chat(update).category_dict[0] = CategoryEnum.BIKEPARTS
-        get_chat(update).category_dict[1] = BikepartsCategoryEnum.PEDALS
+        get_chat(update).category_dict[1] = BikepartsCategoryEnum.PEDALSNCLEATS
         get_chat(update).category_dict[2] = category
     if isinstance(category, SteeringCategoryEnum):
         get_chat(update).category_dict[0] = CategoryEnum.BIKEPARTS
@@ -632,7 +662,7 @@ def post_item_process_subcategory(update, context, category):
     if isinstance(category, BikepartsCategoryEnum):
         if category == BikepartsCategoryEnum.SEATING:
             return post_item_show_subcategory(update, context, SeatingCategoryEnum, UserState.WAITING_FOR_SEATING)
-        if category == BikepartsCategoryEnum.PEDALS:
+        if category == BikepartsCategoryEnum.PEDALSNCLEATS:
             return post_item_show_subcategory(update, context, SeatingCategoryEnum, UserState.WAITING_FOR_PEDALS)
         if category == BikepartsCategoryEnum.STEERING:
             return post_item_show_subcategory(update, context, SeatingCategoryEnum, UserState.WAITING_FOR_STEERING)
@@ -961,6 +991,8 @@ def post_item_process_approve(update, context):
                            caption=text,
                            parse_mode=telegram.ParseMode.HTML)
 
+    chat.clean()
+
     # TODO: add link to post
     message_text = "Товар размещен на канале @{}.\nЕсли захочется повторить жми /postitem".format(_CHANNEL)
     send_message(update, context, message_text)
@@ -971,6 +1003,10 @@ def post_item_process_approve(update, context):
 def cancel_handler(update, context):
     delete_prev_keyboard(update, context)
     send_message(update, context, "Всё, проехали...\nЕсли захочется повторить жми /postitem")
+
+    chat = get_chat(update)
+    chat.clean()
+
     return ConversationHandler.END
 
 
@@ -993,6 +1029,42 @@ def error(update, context):
     _LOGGER.warning('Update "%s" caused error "%s"', update, context.error)
 
 
+def build_category_tree():
+    root = Node("Category")
+
+    def fill_simple_category(enum, parent):
+        for e in enum:
+            Node(e, parent=parent)
+
+    for c in CategoryEnum:
+        root_category = Node(c, parent=root)
+        if c == CategoryEnum.BIKEPARTS:
+            for b in BikepartsCategoryEnum:
+                bikeparts_category = Node(b, parent=root_category)
+                if b == BikepartsCategoryEnum.SEATING:
+                    fill_simple_category(SeatingCategoryEnum, bikeparts_category)
+                if b == BikepartsCategoryEnum.STEERING:
+                    fill_simple_category(SteeringCategoryEnum, bikeparts_category)
+                if b == BikepartsCategoryEnum.DRIVETRAIN:
+                    fill_simple_category(DrivetrainCategoryEnum, bikeparts_category)
+                if b == BikepartsCategoryEnum.PEDALSNCLEATS:
+                    fill_simple_category(PedalsNCleatsCategoryEnum, bikeparts_category)
+                if b == BikepartsCategoryEnum.BRAKES:
+                    fill_simple_category(BrakesCategoryEnum, bikeparts_category)
+        if c == CategoryEnum.BIKES:
+            fill_simple_category(BikesCategoryEnum, root_category)
+        if c == CategoryEnum.BAGS:
+            fill_simple_category(BagsCategoryEnum, root_category)
+        if c == CategoryEnum.MAINTENANCE:
+            fill_simple_category(MaintenanceCategoryEnum, root_category)
+        if c == CategoryEnum.ACCESSORIES:
+            fill_simple_category(AccessoriesCategoryEnum, root_category)
+        if c == CategoryEnum.WHEELSNTYRES:
+            fill_simple_category(WheelsNTyresCategoryEnum, root_category)
+
+    return root
+
+
 if __name__ == "__main__":
     if len(sys.argv) != 2:
         print("give me json with settings as argument!")
@@ -1007,6 +1079,10 @@ if __name__ == "__main__":
 
     logger_file_name = "{}_{}".format("bot", _CHANNEL)
     set_logger_handlers(logger_file_name)
+
+    category_tree = build_category_tree()
+    for pre, fill, node in RenderTree(category_tree):
+        print("%s%s" % (pre, node.name))
 
     updater = Updater(_TOKEN_TELEGRAM, use_context=True)
     dispatcher = updater.dispatcher
@@ -1029,17 +1105,17 @@ if __name__ == "__main__":
         return handlers
 
 
-    waiting_for_bicycle_h = make_subcategory_handlers(BicycleCategoryEnum)
+    waiting_for_bicycle_h = make_subcategory_handlers(BikesCategoryEnum)
 
     waiting_for_component_h = make_subcategory_handlers(BikepartsCategoryEnum)
     waiting_for_seating_h = make_subcategory_handlers(SeatingCategoryEnum)
     waiting_for_steering_h = make_subcategory_handlers(SteeringCategoryEnum)
-    waiting_for_pedals_h = make_subcategory_handlers(PedalsCategoryEnum)
+    waiting_for_pedals_h = make_subcategory_handlers(PedalsNCleatsCategoryEnum)
     waiting_for_drivetrain_h = make_subcategory_handlers(DrivetrainCategoryEnum)
 
     waiting_for_accessories_h = make_subcategory_handlers(AccessoriesCategoryEnum)
     waiting_for_bags_h = make_subcategory_handlers(BagsCategoryEnum)
-    waiting_for_wheels_h = make_subcategory_handlers(WheelsCategoryEnum)
+    waiting_for_wheels_h = make_subcategory_handlers(WheelsNTyresCategoryEnum)
     waiting_for_service_h = make_subcategory_handlers(MaintenanceCategoryEnum)
 
     top_cities = get_top_cities()
