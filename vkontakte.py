@@ -1,6 +1,8 @@
 import vk_api
 from enum import IntEnum
-from structures import Seller, Group
+
+from util import get_from_dict
+from structures import Seller, Group, City
 
 
 class VkErrorCodesEnum(IntEnum):
@@ -86,3 +88,20 @@ class VkontakteInfoGetter:
             cities.extend(c)
         return cities
 
+    def search_city(self, query, country_id=1, count=9):
+        query = query[:15]
+        response = self._vk_api.database.getCities(country_id=country_id, q=query, count=count)
+        if response['count'] == 0:
+            return None
+        cities = []
+        city_ids_set = set()
+        for c in response['items']:
+            city_id = c['id']
+            if city_id in city_ids_set:
+                continue
+            city = City(city_id, c['title'])
+            city.area = get_from_dict(c, 'area')
+            city.region = get_from_dict(c, 'region')
+            cities.append(city)
+            city_ids_set.add(city_id)
+        return cities

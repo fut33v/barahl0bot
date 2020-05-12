@@ -245,4 +245,6 @@ class City:
     def __init__(self, city_id, title):
         self.id = city_id
         self.title = title
+        self.area = None
+        self.region = None
 

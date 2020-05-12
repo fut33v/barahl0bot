@@ -14,7 +14,7 @@ from vk_api.exceptions import ApiError
 
 from database import Barahl0botDatabase
 from settings import Barahl0botSettings
-from structures import Album
+from structures import Album, City
 from vkontakte import VkontakteInfoGetter
 import util
 
@@ -131,6 +131,7 @@ class Chat:
         self.price = None
         self.ship = None
         self.city = None
+        self.country = None
         self.caption = None
         self.description = None
 
@@ -144,6 +145,10 @@ class Chat:
 
     def get_hashtags(self):
         hashtags = ""
+        city_hashtag = self.city.title
+        city_hashtag = city_hashtag.replace(' ', '_')
+        city_hashtag = city_hashtag.replace('-', '_')
+        hashtags += "#" + city_hashtag + " "
         for c in self.category_dict.items():
             if c[1] is not None:
                 hashtags += "#" + c[1].name.lower() + " "
@@ -155,10 +160,16 @@ class UserState(Enum):
 
     WAITING_FOR_CATEGORY = 1
     WAITING_FOR_PHOTO = 2
+
     WAITING_FOR_CURRENCY = 3
     WAITING_FOR_PRICE = 4
+
     WAITING_FOR_SHIP = 5
     WAITING_FOR_CITY = 6
+    WAITING_FOR_COUNTRY = 61
+    WAITING_FOR_OTHER_CITY_NAME = 62
+    WAITING_FOR_OTHER_CITY = 63
+
     WAITING_FOR_CAPTION = 7
     WAITING_FOR_DESCRIPTION = 8
     WAITING_FOR_APPROVE = 9
@@ -285,6 +296,20 @@ class PhotoOrAlbumEnum(Enum):
     ALBUM = "альбом"
 
 
+class Country:
+    def __init__(self, country_id, name, flag):
+        self.id = country_id
+        self.name = name
+        self.flag = flag
+
+
+class CountriesEnum(Enum):
+    RUSSIA = Country(1, "Россия", "🇷🇺")
+    UKRAINE = Country(2, "Украина", "🇺🇦")
+    BELARUS = Country(3, "Беларусь", "🇧🇾")
+    KAZAHSTAN = Country(4, "Казахстан", "🇰🇿")
+
+
 class CurrencyEnum(Enum):
     RUB = 'RUB ₽'
     USD = 'USD $'
@@ -307,6 +332,7 @@ class CallbackDataEnum(Enum):
     CITY = 'City'
 
 
+REGEXP_OTHER_CITY = re.compile(CallbackDataEnum.CITY_OTHER.name + "(\d*)")
 CHATS_DICT = {}
 POSTFIX_CANCEL = "\n/cancel для отмены."
 
@@ -317,6 +343,24 @@ def get_top_cities():
 
 def get_button_for_enum(enum_member):
     return InlineKeyboardButton(enum_member.value, callback_data=enum_member.name)
+
+
+def keyboard_for_countries(columns=2):
+    keyboard = []
+    counter = 1
+    row = []
+    for c in CountriesEnum:
+        button = InlineKeyboardButton(c.value.name + c.value.flag, callback_data=c.name)
+        row.append(button)
+        if counter % columns == 0:
+            keyboard.append(row)
+            row = []
+        counter += 1
+
+    if row:
+        keyboard.append(row)
+
+    return keyboard
 
 
 def keyboard_for_enum(enum, columns=2):
@@ -646,7 +690,8 @@ def post_item_process_photo(update, context):
 
 def post_item_process_currency(update, context, currency):
     get_chat(update).currency = currency
-    message_text = "Введи цену в выбранной валюте *{}*\n".format(CurrencyEnum[currency.name].value)
+    message_text = \
+        "Введи цену в выбранной валюте *{}*\n(_отдаешь бесплатно - пиши 0_)\n".format(CurrencyEnum[currency.name].value)
     delete_prev_message(update, context)
     message = context.bot.send_message(chat_id=update.effective_chat.id,
                                        text=message_text, parse_mode=telegram.ParseMode.MARKDOWN)
@@ -660,7 +705,8 @@ def post_item_process_price(update, context):
     price = update.effective_message.text
 
     if not REGEXP_ONLY_DIGITS.match(price):
-        send_message(update, context, "Я приму лишь цифры в цене, давай еще разок...")
+        send_message(update, context,
+                     "Я приму лишь цифры в цене _если отдаешь забесплатно пиши ноль_, давай еще разок...")
         return UserState.WAITING_FOR_PRICE
 
     get_chat(update).price = int(price)
@@ -680,12 +726,37 @@ def post_item_process_price(update, context):
     return UserState.WAITING_FOR_SHIP
 
 
+def keyboard_for_cities(cities, columns=2, callback_data_prefix=CallbackDataEnum.CITY.name):
+    keyboard = []
+    counter = 1
+    row = []
+    titles_set = set()
+    same_titles = []
+    for c in cities:
+        if c.title in titles_set:
+            same_titles.append(c.title)
+        titles_set.add(c.title)
+
+    for c in cities:
+        if c.title in same_titles:
+            keyboard_text = c.title
+            if c.area:
+                keyboard_text += " (" + c.area + ")"
+        else:
+            keyboard_text = c.title
+        row.append(InlineKeyboardButton(keyboard_text, callback_data=callback_data_prefix + str(c.id)))
+        if counter % columns == 0:
+            keyboard.append(row)
+            row = []
+        counter += 1
+
+    return keyboard
 
 
 def post_item_process_ship(update, context, ship):
     get_chat(update).ship = ship
 
-    message_text = "Ты выбрал такой способ доставки: *{}*".format(ship.value)
+    message_text = "Ты выбрал способ доставки: *{}*".format(ship.value)
     send_message(update, context, message_text)
 
     message_text = """📍 *Город.*
@@ -695,17 +766,8 @@ def post_item_process_ship(update, context, ship):
     """.format(CallbackDataEnum.CITY_OTHER.value)
     delete_prev_keyboard(update, context)
 
-    top_cities = get_top_cities()
-
-    keyboard = []
-    counter = 0
-    row = []
-    for c in top_cities:
-        row.append(InlineKeyboardButton(c.title, callback_data=CallbackDataEnum.CITY.name + str(c.id)))
-        if counter % 2 == 0:
-            keyboard.append(row)
-            row = []
-        counter += 1
+    cities = get_top_cities()
+    keyboard = keyboard_for_cities(cities)
 
     keyboard.append(
         [InlineKeyboardButton(CallbackDataEnum.CITY_OTHER.value, callback_data=CallbackDataEnum.CITY_OTHER.name)])
@@ -722,8 +784,67 @@ def post_item_process_ship(update, context, ship):
     return UserState.WAITING_FOR_CITY
 
 
+def post_item_other_city(update, context):
+    delete_prev_keyboard(update, context)
+
+    keyboard = keyboard_for_countries()
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    message_text = "Выбери страну"
+    message = send_message(update, context, message_text, reply_markup)
+    save_message_id(update, message)
+
+    return UserState.WAITING_FOR_COUNTRY
+
+
+def post_item_process_country(update, context, country):
+    delete_prev_keyboard(update, context)
+
+    get_chat(update).country = country
+
+    message_text = "Введи название своего города"
+    message = send_message(update, context, message_text)
+    save_message_id(update, message)
+
+    return UserState.WAITING_FOR_OTHER_CITY_NAME
+
+
+def post_item_process_other_city_name(update, context):
+    city_name = update.effective_message.text
+    chat = get_chat(update)
+    cities = _VK_INFO_GETTER.search_city(query=city_name, country_id=chat.country.id, count=9)
+    chat.cities = cities
+    keyboard = keyboard_for_cities(cities, callback_data_prefix=CallbackDataEnum.CITY_OTHER.name)
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    message_text = "Выбери свой город"
+    message = send_message(update, context, message_text, reply_markup)
+    save_message_id(update, message)
+
+    return UserState.WAITING_FOR_OTHER_CITY
+
+
+def post_item_process_other_city(update, context):
+    callback_data = update.callback_query.data
+    m = REGEXP_OTHER_CITY.search(callback_data)
+    city_id = int(m.group(1))
+    chat = get_chat(update)
+    other_city = None
+    for c in chat.cities:
+        if c.id == city_id:
+            other_city = c
+
+    if other_city is None:
+        # error
+        return ConversationHandler.END
+
+    return post_item_process_city(update, context, other_city)
+
+
 def post_item_process_city(update, context, city):
     get_chat(update).city = city
+
+    # TODO: save city_id to database for this user
 
     message_text = "Ты выбрал город *{}*".format(city.title)
     send_message(update, context, message_text)
@@ -766,7 +887,6 @@ def post_item_process_caption(update, context):
 
 
 def build_product_text(update):
-
     if update.effective_user.username:
         seller_name = update.effective_user.username
     else:
@@ -899,7 +1019,8 @@ if __name__ == "__main__":
 
     back_handler = CallbackQueryHandler(post_item_go_back, pattern='^' + CallbackDataEnum.BACK.name + '$')
 
-    def do_shit(enum):
+
+    def make_subcategory_handlers(enum):
         handlers = [
             CallbackQueryHandler(
                 partial(post_item_process_subcategory, category=x),
@@ -907,20 +1028,34 @@ if __name__ == "__main__":
         handlers.append(back_handler)
         return handlers
 
-    waiting_for_bicycle_h = do_shit(BicycleCategoryEnum)
 
-    waiting_for_component_h = do_shit(BikepartsCategoryEnum)
-    waiting_for_seating_h = do_shit(SeatingCategoryEnum)
-    waiting_for_steering_h = do_shit(SteeringCategoryEnum)
-    waiting_for_pedals_h = do_shit(PedalsCategoryEnum)
-    waiting_for_drivetrain_h = do_shit(DrivetrainCategoryEnum)
+    waiting_for_bicycle_h = make_subcategory_handlers(BicycleCategoryEnum)
 
-    waiting_for_accessories_h = do_shit(AccessoriesCategoryEnum)
-    waiting_for_bags_h = do_shit(BagsCategoryEnum)
-    waiting_for_wheels_h = do_shit(WheelsCategoryEnum)
-    waiting_for_service_h = do_shit(MaintenanceCategoryEnum)
+    waiting_for_component_h = make_subcategory_handlers(BikepartsCategoryEnum)
+    waiting_for_seating_h = make_subcategory_handlers(SeatingCategoryEnum)
+    waiting_for_steering_h = make_subcategory_handlers(SteeringCategoryEnum)
+    waiting_for_pedals_h = make_subcategory_handlers(PedalsCategoryEnum)
+    waiting_for_drivetrain_h = make_subcategory_handlers(DrivetrainCategoryEnum)
+
+    waiting_for_accessories_h = make_subcategory_handlers(AccessoriesCategoryEnum)
+    waiting_for_bags_h = make_subcategory_handlers(BagsCategoryEnum)
+    waiting_for_wheels_h = make_subcategory_handlers(WheelsCategoryEnum)
+    waiting_for_service_h = make_subcategory_handlers(MaintenanceCategoryEnum)
 
     top_cities = get_top_cities()
+
+    waiting_for_city_h = [
+        CallbackQueryHandler(partial(post_item_process_city, city=x),
+                             pattern='^' + CallbackDataEnum.CITY.name + str(x.id) + '$') for x in top_cities]
+    waiting_for_city_h.append(
+        CallbackQueryHandler(post_item_other_city, pattern='^' + CallbackDataEnum.CITY_OTHER.name + '$'))
+
+    waiting_for_country_h = [CallbackQueryHandler(partial(post_item_process_country, country=x.value),
+                                                  pattern='^' + x.name + '$') for x in CountriesEnum]
+
+    waiting_for_other_city_h = [
+        CallbackQueryHandler(post_item_process_other_city,
+                             pattern='^' + CallbackDataEnum.CITY_OTHER.name + '\d*' + '$')]
 
     dispatcher.add_handler(
         ConversationHandler(
@@ -958,10 +1093,11 @@ if __name__ == "__main__":
                     [CallbackQueryHandler(partial(post_item_process_ship, ship=x),
                                           pattern='^' + x.name + '$') for x in ShippingEnum],
 
-                UserState.WAITING_FOR_CITY:
-                    [CallbackQueryHandler(partial(post_item_process_city, city=x),
-                                          pattern='^' + CallbackDataEnum.CITY.name + str(x.id) + '$') for x in
-                     top_cities],
+                UserState.WAITING_FOR_CITY: waiting_for_city_h,
+                UserState.WAITING_FOR_COUNTRY: waiting_for_country_h,
+                UserState.WAITING_FOR_OTHER_CITY_NAME: [MessageHandler(
+                    callback=post_item_process_other_city_name, filters=Filters.text)],
+                UserState.WAITING_FOR_OTHER_CITY: waiting_for_other_city_h,
 
                 UserState.WAITING_FOR_CAPTION: [MessageHandler(
                     callback=post_item_process_caption, filters=Filters.text)],

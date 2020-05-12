@@ -161,3 +161,15 @@ def get_photo_hash(url):
     sha.update(photo)
     h = sha.hexdigest()
     return h
+
+
+def escape_markdown(txt):
+    match_md = r'((([_*]).+?\3[^_*]*)*)([_*])'
+    return re.sub(match_md, "\g<1>\\\\\g<4>", txt)
+
+
+def get_from_dict(d, k):
+    if k in d:
+        return d[k]
+    else:
+        return None
