@@ -664,9 +664,9 @@ def post_item_process_subcategory(update, context, category):
         if category == BikepartsCategoryEnum.SEATING:
             return post_item_show_subcategory(update, context, SeatingCategoryEnum, UserState.WAITING_FOR_SEATING)
         if category == BikepartsCategoryEnum.PEDALSNCLEATS:
-            return post_item_show_subcategory(update, context, SeatingCategoryEnum, UserState.WAITING_FOR_PEDALS)
+            return post_item_show_subcategory(update, context, PedalsNCleatsCategoryEnum, UserState.WAITING_FOR_PEDALS)
         if category == BikepartsCategoryEnum.STEERING:
-            return post_item_show_subcategory(update, context, SeatingCategoryEnum, UserState.WAITING_FOR_STEERING)
+            return post_item_show_subcategory(update, context, SteeringCategoryEnum, UserState.WAITING_FOR_STEERING)
         if category == BikepartsCategoryEnum.DRIVETRAIN:
             return post_item_show_subcategory(update, context, DrivetrainCategoryEnum, UserState.WAITING_FOR_DRIVETRAIN)
 
