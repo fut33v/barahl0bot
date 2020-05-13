@@ -787,8 +787,6 @@ def post_item_process_price(update, context):
     return UserState.WAITING_FOR_SHIP
 
 
-
-
 def post_item_process_ship(update, context, ship):
     get_chat(update).ship = ship
 
@@ -933,17 +931,18 @@ def build_product_text(update):
            "{hashtags}\n\n" \
            "<b>Наименование:</b> {caption}\n\n" \
            "<b>Описание:</b> {descr}\n\n" \
-           "<b>Город:</b> {city}\n\n" \
+           "<b>Город:</b> {city}\n" \
+           "<b>Отправка:</b> {ship}\n\n" \
            "<b>Цена:</b> {price} {currency}\n\n" \
-           "<b>Продавец:</b> {seller}".format(
-        category_string=category_string,
-        hashtags=hashtags,
-        caption=html.escape(chat.caption),
-        descr=html.escape(chat.description),
-        city=chat.city.title,
-        price=chat.price,
-        currency=chat.currency.value,
-        seller=seller)
+           "<b>Продавец:</b> {seller}".format(category_string=category_string,
+                                              hashtags=hashtags,
+                                              caption=html.escape(chat.caption),
+                                              descr=html.escape(chat.description),
+                                              city=chat.city.title,
+                                              ship=chat.ship.value,
+                                              price=chat.price,
+                                              currency=chat.currency.value,
+                                              seller=seller)
 
     # text = html.escape(text)
 
