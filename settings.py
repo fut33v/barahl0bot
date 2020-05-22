@@ -9,6 +9,9 @@ class Barahl0botSettings:
     def __init__(self, _filename):
         self._settings = util.load_json_file(_filename)
         print(self._settings)
+
+        self.dbms = self._settings['dbms']
+
         self.token_telegram = self._settings['token_telegram']
         self.token_vk = self._settings['token_vk']
 

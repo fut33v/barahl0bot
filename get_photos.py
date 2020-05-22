@@ -1,6 +1,7 @@
 import time
 import logging
-import datetime
+from datetime import datetime, timezone
+
 import os
 import traceback
 import sys
@@ -12,7 +13,7 @@ import telegram.ext
 import telegram.error
 
 from settings import Barahl0botSettings
-from database import Barahl0botDatabase
+import database
 from vkontakte import VkErrorCodesEnum, VkontakteInfoGetter
 from structures import Album, Photo, Seller, Product
 import util
@@ -72,8 +73,17 @@ def try_update_post_message(product, product_from_db):
 
     product.seller = seller
 
-    same_comments = product.get_comments_text(restrict=False) == product_from_db.comments_text
-    same_text = product.get_description_text(restrict=False) == product_from_db.descr
+    product_comments = product.get_comments_text(restrict=False)
+    same_comments = product_comments == product_from_db.comments_text
+
+    product_descr = product.get_description_text(restrict=False)
+    same_text = product_descr == product_from_db.descr
+
+    # if None and empty string
+    if not same_text and not product_descr and not product_from_db.descr:
+        same_text = True
+    if not same_comments and not product_comments and not product_from_db.comments_text:
+        same_comments = True
 
     if same_comments and same_text:
         return
@@ -193,7 +203,7 @@ def remove_logger_handlers():
 
 
 def set_logger_handlers():
-    now = datetime.datetime.now()
+    now = datetime.now()
     now = now.strftime("%d_%m_%Y")
 
     log_filename = _LOGS_DIR + "/{}_{}_debug.log".format(_CHANNEL, now)
@@ -237,7 +247,9 @@ def process_album(_album):
     photos_links = [p.photo.build_url() for p in products]
     _LOGGER.info("{} New products: {}".format(len(products), str(photos_links).strip('[]')))
 
-    now = datetime.datetime.now()
+    # now = datetime.datetime.now()
+    now = datetime.now(timezone.utc)
+
     for p in products:
         # if duplicate but was more than week ago then post
         if p.is_duplicate:
@@ -283,11 +295,11 @@ def process_album(_album):
 
 
 def main_loop():
-    previous_day = datetime.datetime.now().day
+    previous_day = datetime.now().day
 
     while True:
 
-        today = datetime.datetime.now().day
+        today = datetime.now().day
         if today != previous_day:
             remove_logger_handlers()
             set_logger_handlers()
@@ -299,7 +311,7 @@ def main_loop():
             process_album(a)
             time.sleep(_SETTINGS.seconds_to_sleep_between_albums)
 
-        previous_day = datetime.datetime.now().day
+        previous_day = datetime.now().day
 
         _LOGGER.info("Sleep for {} seconds".format(_SETTINGS.seconds_to_sleep))
         time.sleep(_SETTINGS.seconds_to_sleep)
@@ -318,13 +330,14 @@ if __name__ == "__main__":
     _WEBSITE = _SETTINGS.website
     _ERROR_CHANNEL = _SETTINGS.error_channel
 
-    _DATABASE = Barahl0botDatabase(_CHANNEL)
+    _DATABASE = database.get_database(_SETTINGS.dbms, _CHANNEL)
 
     _VK_INFO_GETTER = VkontakteInfoGetter(_SETTINGS.token_vk)
 
     _ERROR_GET_PHOTOS_X_PHOTOS_NONE_COUNT = 0
 
     try:
+
         if not os.path.exists(_LOGS_DIR):
             os.mkdir(_LOGS_DIR)
 

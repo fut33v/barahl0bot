@@ -1,13 +1,18 @@
 {
+  "dbms": "postgre",
+
   "token_telegram": "" ,
   "token_vk": "",
+
   "channel": "barahl0",
   "error_channel": "barahlochannel_error",
   "admins": ["fut33v"],
-  "seconds_to_sleep": 120,
-  "timeout_for_photo_seconds" : 180,
-  "too_old_for_photo_seconds": 86400,
+  "website": "http://barahloch.ru/",
 
+  "seconds_to_sleep_between_albums": 1,
+  "seconds_to_sleep": 120,
+  "timeout_for_photo_seconds" : 0,
+  "too_old_for_photo_seconds": 86400,
   "days_timeout_for_product": 3
 }
 

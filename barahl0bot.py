@@ -14,7 +14,7 @@ from vk_api.exceptions import ApiError
 
 from anytree import Node, RenderTree
 
-from database import Barahl0botDatabase
+import database
 from settings import Barahl0botSettings
 from structures import Album, City
 from vkontakte import VkontakteInfoGetter
@@ -1083,7 +1083,7 @@ if __name__ == "__main__":
     _SETTINGS = Barahl0botSettings(settings_filename)
     _TOKEN_TELEGRAM = _SETTINGS.token_telegram
     _CHANNEL = _SETTINGS.channel
-    _DATABASE = Barahl0botDatabase(_CHANNEL)
+    _DATABASE = database.get_database(_SETTINGS.dbms, _CHANNEL)
     _VK_INFO_GETTER = VkontakteInfoGetter(_SETTINGS.token_vk)
 
     logger_file_name = "{}_{}".format("bot", _CHANNEL)
