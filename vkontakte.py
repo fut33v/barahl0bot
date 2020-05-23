@@ -2,7 +2,8 @@ import vk_api
 from enum import IntEnum
 
 from util import get_from_dict
-from structures import Seller, Group, City
+from structures import Seller, Group, City, Photo
+import requests
 
 
 class VkErrorCodesEnum(IntEnum):
@@ -105,3 +106,26 @@ class VkontakteInfoGetter:
             cities.append(city)
             city_ids_set.add(city_id)
         return cities
+
+    def upload_photo(self, album_id: int, group_id: int, photo_filename, caption: str):
+        group_id = abs(group_id)
+        upload_server = self._vk_api.photos.getUploadServer(album_id=album_id, group_id=group_id)
+        upload_url = upload_server['upload_url']
+        r = requests.post(upload_url, files={'file1': open(photo_filename, "rb")})
+        if r.status_code != requests.codes.ok:
+            print("failed to POST photo!")
+            return None
+        j = r.json()
+        photo = self._vk_api.photos.save(server=j['server'],
+                                         photos_list=j['photos_list'],
+                                         hash=j['hash'],
+                                         group_id=group_id,
+                                         album_id=album_id,
+                                         caption=caption)
+
+        if not photo or len(photo) == 0:
+            return None
+
+        photo = Photo(photo[0])
+
+        return photo

@@ -5,11 +5,9 @@ import pymysql
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
-
 import time
-from structures import Album, Product, Seller, City, Group
+from structures import Album, Product, Seller, City, Group, TelegramSeller, TelegramProduct, Photo
 from abc import ABC, abstractmethod
-
 
 _LOGGER = logging.getLogger("barahl0bot")
 
@@ -28,6 +26,9 @@ class BarahlochDatabase(ABC):
         self._sellers_table = "sellers"
         self._cities_table = "cities"
         self._groups_table = "groups"
+
+        self._tg_sellers_table = "tg_sellers"
+        self._tg_goods_table = "tg_goods"
         return
 
     @abstractmethod
@@ -35,15 +36,15 @@ class BarahlochDatabase(ABC):
         pass
 
     @abstractmethod
-    def is_album_in_table(self, album):
+    def is_album_in_table(self, album: Album):
         pass
 
     @abstractmethod
-    def insert_album(self, album):
+    def insert_album(self, album: Album):
         pass
 
     @abstractmethod
-    def delete_album(self, album):
+    def delete_album(self, album: Album):
         pass
 
     @abstractmethod
@@ -55,7 +56,7 @@ class BarahlochDatabase(ABC):
         pass
 
     @abstractmethod
-    def insert_group(self, group):
+    def insert_group(self, group: Group):
         pass
 
     @abstractmethod
@@ -63,15 +64,15 @@ class BarahlochDatabase(ABC):
         pass
 
     @abstractmethod
-    def is_photo_posted_by_id(self, photo):
+    def is_photo_posted_by_id(self, photo: Photo):
         pass
 
     @abstractmethod
-    def insert_product(self, product):
+    def insert_product(self, product: Product):
         pass
 
     @abstractmethod
-    def update_product_text_and_comments(self, product):
+    def update_product_text_and_comments(self, product: Product):
         pass
 
     @abstractmethod
@@ -79,19 +80,31 @@ class BarahlochDatabase(ABC):
         pass
 
     @abstractmethod
-    def is_seller_in_table_by_id(self, seller_id):
+    def get_seller_by_id(self, seller_id):
         pass
 
     @abstractmethod
-    def insert_seller(self, seller):
+    def insert_seller(self, seller: Seller):
         pass
 
     @abstractmethod
-    def insert_city(self, city):
+    def insert_city(self, city: City):
         pass
 
     @abstractmethod
     def get_top_cities(self, limit):
+        pass
+
+    @abstractmethod
+    def insert_tg_seller(self, tg_seller: TelegramSeller):
+        pass
+
+    @abstractmethod
+    def get_tg_seller_by_id(self, tg_seller_id: int):
+        pass
+
+    @abstractmethod
+    def insert_tg_product(self, tg_product: TelegramProduct):
         pass
 
 
@@ -167,7 +180,7 @@ class PostgreBarahlochDatabase(BarahlochDatabase):
         group_id = abs(group_id)
         with self._connection.cursor() as cursor:
             sql = "SELECT * FROM {t} WHERE id=%s".format(t=self._groups_table)
-            cursor.execute(sql, (group_id, ))
+            cursor.execute(sql, (group_id,))
             result = cursor.fetchone()
             if result:
                 return True
@@ -205,7 +218,7 @@ class PostgreBarahlochDatabase(BarahlochDatabase):
     def is_photo_posted_by_hash(self, _hash):
         with self._connection.cursor() as cursor:
             sql = "SELECT tg_post_id, date FROM {t} WHERE hash=%s ORDER BY date DESC".format(t=self._goods_table)
-            cursor.execute(sql, (_hash, ))
+            cursor.execute(sql, (_hash,))
             result = cursor.fetchone()
             if result:
                 return {
@@ -223,7 +236,8 @@ class PostgreBarahlochDatabase(BarahlochDatabase):
                   "tg_post_id," \
                   "hash," \
                   "comments" \
-                  " FROM {t} WHERE vk_owner_id=%s AND vk_photo_id=%s AND tg_post_id IS NOT NULL".format(t=self._goods_table)
+                  " FROM {t} WHERE vk_owner_id=%s AND vk_photo_id=%s AND tg_post_id IS NOT NULL".format(
+                t=self._goods_table)
             cursor.execute(sql, (photo.owner_id, photo.photo_id,))
             result = cursor.fetchone()
             if result:
@@ -298,6 +312,7 @@ class PostgreBarahlochDatabase(BarahlochDatabase):
             cursor.execute(sql, (text, comments, photo.owner_id, photo.photo_id))
         self._connection.commit()
 
+    # TODO: to get_city
     def get_city_title(self, city_id):
         with self._connection.cursor(cursor_factory=RealDictCursor) as cursor:
             sql = "SELECT * FROM {t} WHERE id=%s".format(t=self._cities_table)
@@ -307,10 +322,10 @@ class PostgreBarahlochDatabase(BarahlochDatabase):
                 return result["title"]
         return False
 
-    def is_seller_in_table_by_id(self, seller_id):
+    def get_seller_by_id(self, seller_id):
         with self._connection.cursor(cursor_factory=RealDictCursor) as cursor:
             sql = "SELECT * FROM {t} WHERE vk_id=%s".format(t=self._sellers_table)
-            cursor.execute(sql, (seller_id, ))
+            cursor.execute(sql, (seller_id,))
             result = cursor.fetchone()
             if result:
                 seller = Seller()
@@ -325,14 +340,11 @@ class PostgreBarahlochDatabase(BarahlochDatabase):
                 return seller
         return False
 
-    def insert_seller(self, seller):
-        if not isinstance(seller, Seller):
-            return
+    def insert_seller(self, seller: Seller):
         with self._connection.cursor() as cursor:
             if seller.city_id and seller.city_title:
                 city = City(seller.city_id, seller.city_title)
                 self.insert_city(city)
-            # insert seller
             sql = 'INSERT INTO {t} (' \
                   'vk_id, ' \
                   'first_name,' \
@@ -366,7 +378,7 @@ class PostgreBarahlochDatabase(BarahlochDatabase):
                 "GROUP BY city_id " \
                 "HAVING city_id IS NOT NULL " \
                 "ORDER BY counter DESC LIMIT %s".format(t=self._sellers_table)
-            self._execute(cursor, sql, (limit, ))
+            self._execute(cursor, sql, (limit,))
             result = cursor.fetchall()
             if not result:
                 return None
@@ -380,8 +392,91 @@ class PostgreBarahlochDatabase(BarahlochDatabase):
                 cities.append(City(c['id'], c['title']))
             return cities
 
+    def get_tg_seller_by_id(self, tg_seller_id: int):
+        with self._connection.cursor(cursor_factory=RealDictCursor) as cursor:
+            sql = "SELECT * FROM {t} WHERE tg_user_id=%s".format(t=self._tg_sellers_table)
+            cursor.execute(sql, (tg_seller_id,))
+            result = cursor.fetchone()
+            if result:
+                city_title = self.get_city_title(result['city_id'])
+                city = City(city_id=result['city_id'], title=city_title)
+                tg_seller = TelegramSeller(tg_id=result['tg_user_id'],
+                                           tg_chat_id=result['tg_chat_id'],
+                                           full_name=result['full_name'],
+                                           username=result['username'],
+                                           city=city)
+                return tg_seller
+        return False
+
+    def insert_tg_seller(self, tg_seller: TelegramSeller):
+        with self._connection.cursor() as cursor:
+            # if no city like this then insert it
+            if not self.get_city_title(tg_seller.city.id):
+                self.insert_city(tg_seller.city)
+            sql = 'INSERT INTO {t} (' \
+                  'tg_user_id, ' \
+                  'tg_chat_id,' \
+                  'full_name,' \
+                  'username,' \
+                  'city_id) ' \
+                  'VALUES(%s, %s, %s, %s, %s);'.format(t=self._tg_sellers_table)
+            cursor.execute(sql, (tg_seller.tg_id,
+                                 tg_seller.tg_chat_id,
+                                 tg_seller.full_name,
+                                 tg_seller.username,
+                                 tg_seller.city.id))
+        self._connection.commit()
+
+    def insert_tg_product(self, tg_product: TelegramProduct):
+        with self._connection.cursor() as cursor:
+
+            # insert seller if not in table
+            if not self.get_tg_seller_by_id(tg_product.seller.tg_id):
+                self.insert_tg_seller(tg_product.seller)
+
+            sql = 'INSERT INTO {t} (' \
+                  'tg_user_id, ' \
+                  'tg_post_id, ' \
+                  'photo_link,' \
+                  'caption,' \
+                  'descr,' \
+                  'hash,' \
+                  'category,' \
+                  'price,' \
+                  'currency,' \
+                  'ship,' \
+                  'vk_owner_id,' \
+                  'vk_photo_id,' \
+                  'date) ' \
+                  'VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW());'.format(t=self._tg_goods_table)
+
+            cursor.execute(sql, (
+                tg_product.seller.tg_id,
+                tg_product.tg_post_id,
+                tg_product.photo_link,
+                tg_product.caption,
+                tg_product.descr,
+                tg_product.photo_hash,
+                tg_product.category.name,
+                tg_product.price,
+                tg_product.currency.name,
+                tg_product.ship.name,
+                tg_product.vk_owner_id,
+                tg_product.vk_photo_id
+            ))
+
+        self._connection.commit()
+
+        pass
+
 
 class MysqlBarahlochDatabase(BarahlochDatabase):
+    def insert_tg_seller(self, tg_seller: TelegramSeller):
+        raise NotImplementedError()
+
+    def insert_tg_product(self, tg_product: TelegramProduct):
+        raise NotImplementedError()
+
     def __init__(self, channel, database='barahlochannel'):
         super().__init__(channel)
 
@@ -431,7 +526,7 @@ class MysqlBarahlochDatabase(BarahlochDatabase):
                   'title,' \
                   'description,' \
                   'photo) ' \
-                  'VALUES(%s, %s, %s, %s, %s);'.\
+                  'VALUES(%s, %s, %s, %s, %s);'. \
                 format(t=self._albums_table)
 
             self._execute(cursor, sql, (album.owner_id, album.album_id, album.title, album.description, album.photo))
@@ -449,7 +544,7 @@ class MysqlBarahlochDatabase(BarahlochDatabase):
         group_id = abs(group_id)
         with self._connection.cursor() as cursor:
             sql = "SELECT * FROM {t} WHERE `id`=%s".format(t=self._groups_table)
-            cursor.execute(sql, (group_id, ))
+            cursor.execute(sql, (group_id,))
             result = cursor.fetchone()
             if result:
                 return True
@@ -487,7 +582,7 @@ class MysqlBarahlochDatabase(BarahlochDatabase):
     def is_photo_posted_by_hash(self, _hash):
         with self._connection.cursor() as cursor:
             sql = "SELECT `tg_post_id`,`date` FROM {t} WHERE `hash`=%s ORDER BY date DESC".format(t=self._goods_table)
-            cursor.execute(sql, (_hash, ))
+            cursor.execute(sql, (_hash,))
             result = cursor.fetchone()
             if result:
                 return {
@@ -505,7 +600,8 @@ class MysqlBarahlochDatabase(BarahlochDatabase):
                   "tg_post_id," \
                   "hash," \
                   "comments" \
-                  " FROM {t} WHERE `vk_owner_id`=%s AND `vk_photo_id`=%s AND `tg_post_id` IS NOT NULL".format(t=self._goods_table)
+                  " FROM {t} WHERE `vk_owner_id`=%s AND `vk_photo_id`=%s AND `tg_post_id` IS NOT NULL".format(
+                t=self._goods_table)
             cursor.execute(sql, (photo.owner_id, photo.photo_id,))
             result = cursor.fetchone()
             if result:
@@ -575,7 +671,7 @@ class MysqlBarahlochDatabase(BarahlochDatabase):
         text = product.get_description_text(restrict=False)
         comments = product.get_comments_text(restrict=False)
         with self._connection.cursor() as cursor:
-            sql = "UPDATE {t} SET descr = %s, comments = %s WHERE vk_owner_id = %s AND vk_photo_id = %s;".\
+            sql = "UPDATE {t} SET descr = %s, comments = %s WHERE vk_owner_id = %s AND vk_photo_id = %s;". \
                 format(t=self._goods_table)
             cursor.execute(sql, (text, comments, photo.owner_id, photo.photo_id))
         self._connection.commit()
@@ -589,10 +685,10 @@ class MysqlBarahlochDatabase(BarahlochDatabase):
                 return result["title"]
         return False
 
-    def is_seller_in_table_by_id(self, seller_id):
+    def get_seller_by_id(self, seller_id):
         with self._connection.cursor(pymysql.cursors.DictCursor) as cursor:
             sql = "SELECT * FROM {t} WHERE `vk_id`=%s".format(t=self._sellers_table)
-            cursor.execute(sql, (seller_id, ))
+            cursor.execute(sql, (seller_id,))
             result = cursor.fetchone()
             if result:
                 seller = Seller()
@@ -648,7 +744,7 @@ class MysqlBarahlochDatabase(BarahlochDatabase):
                 "GROUP BY city_id " \
                 "HAVING city_id " \
                 "ORDER BY counter DESC LIMIT %s".format(t=self._sellers_table)
-            self._execute(cursor, sql, (limit, ))
+            self._execute(cursor, sql, (limit,))
             result = cursor.fetchall()
             if not result:
                 return None
@@ -697,10 +793,33 @@ def get_database(dbms: str, channel: str) -> BarahlochDatabase:
 
 
 if __name__ == "__main__":
-    postgre_database = create_database(PostgreCreator(), "barahlochannel")
+    postgre_database = create_database(PostgreCreator(), "barahl0")
 
     albums = postgre_database.get_albums_list()
     print(albums)
 
     print(postgre_database.is_album_in_table(albums[0]))
 
+    test_city = City(city_id=35, title="Novgorod")
+    seller = TelegramSeller(tg_id=228,
+                            tg_chat_id=228,
+                            full_name="peedor",
+                            username="peedor228",
+                            city=test_city)
+
+    from barahl0bot import BikesCategoryEnum, CurrencyEnum, ShippingEnum
+
+    test_tg_product = TelegramProduct(seller=seller,
+                                      tg_post_id=2289,
+                                      photo_link="xyu",
+                                      caption="pasdf",
+                                      descr="aasdfasd",
+                                      category=BikesCategoryEnum.FIX,
+                                      currency=CurrencyEnum.EUR,
+                                      price=228,
+                                      ship=ShippingEnum.DO_NOT_SHIP,
+                                      photo_hash="bb72db68ecddcb393305e5997144d9fa3128d2cf4239e5f228b504e5f1c3cc96",
+                                      vk_owner_id=12345,
+                                      vk_photo_id=54321)
+
+    postgre_database.insert_tg_product(test_tg_product)

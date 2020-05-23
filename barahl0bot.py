@@ -10,15 +10,16 @@ from functools import partial
 import telegram.ext
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import Updater, CommandHandler, ConversationHandler, MessageHandler, Filters, CallbackQueryHandler
+
 from vk_api.exceptions import ApiError
 
-from anytree import Node, RenderTree
+from anytree import Node, RenderTree, LevelOrderGroupIter
 
+import util
 import database
 from settings import Barahl0botSettings
-from structures import Album, City
+from structures import Album, TelegramProduct, TelegramSeller
 from vkontakte import VkontakteInfoGetter
-import util
 
 __author__ = 'fut33v'
 
@@ -159,6 +160,13 @@ class Chat:
                 category_string += c[1].value + "/"
 
         return category_string[:-1]
+
+    def get_category(self):
+        category = None
+        for c in self.category_dict.items():
+            if c[1] is not None:
+                category = c[1]
+        return category
 
     def get_hashtags(self):
         hashtags = ""
@@ -934,17 +942,17 @@ def build_product_text(update):
            "<b>Город:</b> {city}\n" \
            "<b>Отправка:</b> {ship}\n\n" \
            "<b>Цена:</b> {price} {currency}\n\n" \
-           "<b>Продавец:</b> {seller}".format(category_string=category_string,
-                                              hashtags=hashtags,
-                                              caption=html.escape(chat.caption),
-                                              descr=html.escape(chat.description),
-                                              city=chat.city.title,
-                                              ship=chat.ship.value,
-                                              price=chat.price,
-                                              currency=chat.currency.value,
-                                              seller=seller)
-
-    # text = html.escape(text)
+           "<b>Продавец:</b> {seller}\n\n" \
+           "<i>via @{bot_name}</i>".format(category_string=category_string,
+                                           hashtags=hashtags,
+                                           caption=html.escape(chat.caption),
+                                           descr=html.escape(chat.description),
+                                           city=chat.city.title,
+                                           ship=chat.ship.value,
+                                           price=chat.price,
+                                           currency=chat.currency.value,
+                                           seller=seller,
+                                           bot_name=_SETTINGS.bot_name)
 
     return text
 
@@ -980,9 +988,76 @@ def post_item_process_description(update, context):
     return UserState.WAITING_FOR_APPROVE
 
 
-class TelegramGood:
-    def __init__(self, tg_user_id):
-        self.tg_user_id = tg_user_id
+def test_download_photo(update, context):
+    file_id = update.effective_message.photo[-1].file_id
+    file = context.bot.get_file(file_id)
+
+    filename = file.download()
+    try:
+        photo = _VK_INFO_GETTER.upload_photo(album_id=_SETTINGS.storage_vk['album_id'],
+                                             group_id=_SETTINGS.storage_vk['group_id'],
+                                             caption="caption",
+                                             photo_filename=filename)
+    except ApiError as e:
+        _LOGGER.error(e)
+        return None
+
+    # photo.owner_id
+    photo_hash = util.get_file_hash(filename)
+
+
+def save_product_to_database(update, context, message):
+    chat = get_chat(update)
+
+    seller = TelegramSeller(
+        tg_id=update.effective_user.id,
+        full_name=update.effective_user.full_name,
+        username=update.effective_user.username,
+        tg_chat_id=chat.chat_id,
+        city=chat.city)
+
+    file_id = message.photo[-1].file_id
+    file = context.bot.get_file(file_id)
+
+    filename = file.download()
+
+    vk_photo_description = chat.caption + "\n" + chat.description
+
+    try:
+        photo = _VK_INFO_GETTER.upload_photo(album_id=_SETTINGS.storage_vk['album_id'],
+                                             group_id=_SETTINGS.storage_vk['group_id'],
+                                             caption=vk_photo_description,
+                                             photo_filename=filename)
+    except ApiError as e:
+        _LOGGER.error(e)
+        return None
+
+    photo_hash = util.get_file_hash(filename)
+
+    caption = html.escape(chat.caption)
+    descr = html.escape(chat.description)
+    ship = chat.ship
+    price = chat.price
+    currency = chat.currency
+    photo_link = photo.get_widest_photo_url()
+    category = chat.get_category()
+
+    product = TelegramProduct(seller=seller,
+                              tg_post_id=message.message_id,
+                              vk_owner_id=photo.owner_id,
+                              vk_photo_id=photo.photo_id,
+                              photo_hash=photo_hash,
+                              caption=caption,
+                              descr=descr,
+                              ship=ship,
+                              price=price,
+                              category=category,
+                              photo_link=photo_link,
+                              currency=currency)
+
+    _DATABASE.insert_tg_product(product)
+
+    return
 
 
 def post_item_process_approve(update, context):
@@ -995,16 +1070,16 @@ def post_item_process_approve(update, context):
                                      caption=text,
                                      parse_mode=telegram.ParseMode.HTML)
 
-    # TODO: database save seller and good
-
-    chat.clean()
-
-    # TODO: add link to post
     message_text = \
         "Товар размещен на канале @{channel}, ссылка на пост: https://t.me/{channel}/{message_id}.\n\n" \
         "Если захочется повторить жми /postitem".format(
             channel=_CHANNEL, message_id=message.message_id)
     send_message(update, context, message_text)
+
+    if message:
+        save_product_to_database(update, context, message)
+
+    chat.clean()
 
     return ConversationHandler.END
 
@@ -1086,12 +1161,26 @@ if __name__ == "__main__":
     _DATABASE = database.get_database(_SETTINGS.dbms, _CHANNEL)
     _VK_INFO_GETTER = VkontakteInfoGetter(_SETTINGS.token_vk)
 
+    if not _SETTINGS.storage_vk:
+        _LOGGER.error("No VK storage for Telegram photos specified")
+        exit(-1)
+
     logger_file_name = "{}_{}".format("bot", _CHANNEL)
     set_logger_handlers(logger_file_name)
 
     category_tree = build_category_tree()
     for pre, fill, node in RenderTree(category_tree):
         print("%s%s" % (pre, node.name))
+
+    categories_string = ""
+    # leafs = [[node.name for node in children] for children in LevelOrderGroupIter(category_tree)]
+    for pre, fill, node in RenderTree(category_tree):
+        if node.children:
+            continue
+        if not isinstance(node.name, Enum):
+            continue
+        categories_string += "'" + str(node.name.name) + "',"
+    print(categories_string)
 
     updater = Updater(_TOKEN_TELEGRAM, use_context=True)
     dispatcher = updater.dispatcher
@@ -1101,6 +1190,8 @@ if __name__ == "__main__":
     dispatcher.add_handler(CommandHandler('addalbum', add_album_handler))
     dispatcher.add_handler(CommandHandler('removealbum', remove_album_handler))
     dispatcher.add_handler(CommandHandler('postitem', post_item_command_handler))
+
+    # dispatcher.add_handler(MessageHandler(callback=test_download_photo, filters=Filters.photo))
 
     back_handler = CallbackQueryHandler(post_item_go_back, pattern='^' + CallbackDataEnum.BACK.name + '$')
 

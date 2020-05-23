@@ -178,7 +178,7 @@ def get_products_from_album(_album):
             seller_id = vk_photo_dict['user_id']
 
         if seller_id != _OWNER_ID_POST_BY_GROUP_ADMIN:
-            seller = _DATABASE.is_seller_in_table_by_id(seller_id)
+            seller = _DATABASE.get_seller_by_id(seller_id)
             if not seller:
                 time.sleep(2)
                 seller = _VK_INFO_GETTER.get_seller(seller_id)
@@ -266,7 +266,7 @@ def process_album(_album):
         if sent:
             p.tg_post_id = sent['message_id']
 
-            if not _DATABASE.is_seller_in_table_by_id(p.seller.vk_id):
+            if not _DATABASE.get_seller_by_id(p.seller.vk_id):
                 if not p.seller.is_club():
                     _DATABASE.insert_seller(p.seller)
                     _LOGGER.info("New seller saved: {} ".format(p.seller.build_url()))

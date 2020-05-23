@@ -163,6 +163,24 @@ def get_photo_hash(url):
     return h
 
 
+def get_file_hash(filename: str):
+    sha = hashlib.sha256()
+    data = open(filename, "rb").read()
+    sha.update(data)
+    h = sha.hexdigest()
+    return h
+
+
+# def get_photo_hash_with_data(url):
+#     photo = urlopen(url)
+#     if not photo:
+#         return None
+#     sha = hashlib.sha256()
+#     sha.update(photo)
+#     h = sha.hexdigest()
+#     return h, photo
+
+
 def escape_markdown(txt):
     match_md = r'((([_*]).+?\3[^_*]*)*)([_*])'
     return re.sub(match_md, "\g<1>\\\\\g<4>", txt)

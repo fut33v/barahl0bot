@@ -3,7 +3,6 @@ import settings
 import html
 from util import make_numbers_bold, get_unix_timestamp
 
-
 _LOGGER = logging.getLogger("barahl0bot")
 
 
@@ -74,6 +73,8 @@ class Product:
 
         self.descr = None
         self.comments_text = None
+
+        self.tg_post_id = None
 
         if self.comments:
             self.comments_text = self.get_comments_text(self.comments)
@@ -163,7 +164,7 @@ class Product:
             latest_product += \
                 "<b>Предыдущее объявление:</b> " \
                 "<a href=\"https://t.me/{}/{}\">Telegram</a> | <a href=\"{}goods/hash/{}\">barahloch</a> \n". \
-                format(channel, self.prev_tg_post, website, self.photo_hash)
+                    format(channel, self.prev_tg_post, website, self.photo_hash)
 
         latest_product += "<b>История продавца:</b> <a href=\"{}seller/{}\">тут</a>\n".format(website, seller.vk_id)
 
@@ -248,3 +249,44 @@ class City:
         self.area = None
         self.region = None
 
+
+class TelegramSeller:
+    def __init__(self, tg_id: int, full_name: str, username: str, tg_chat_id: int, city: City):
+        self.tg_id = tg_id
+        self.tg_chat_id = tg_chat_id
+        self.full_name = full_name
+        self.username = username
+        self.city = city
+
+
+class TelegramProduct:
+    def __init__(self,
+                 seller: TelegramSeller,
+                 tg_post_id: int,
+                 photo_link: str,
+                 caption: str,
+                 descr: str,
+                 category,
+                 currency,
+                 price: int,
+                 ship,
+                 photo_hash: str,
+                 vk_owner_id: int,
+                 vk_photo_id: int):
+        self.seller = seller
+        self.tg_post_id = tg_post_id
+
+        self.photo_link = photo_link
+
+        self.caption = caption
+        self.descr = descr
+
+        self.category = category
+        self.currency = currency
+        self.price = price
+        self.ship = ship
+
+        self.photo_hash = photo_hash
+
+        self.vk_owner_id = vk_owner_id
+        self.vk_photo_id = vk_photo_id

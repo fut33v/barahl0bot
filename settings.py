@@ -11,6 +11,9 @@ class Barahl0botSettings:
         print(self._settings)
 
         self.dbms = self._settings['dbms']
+        self.bot_name = self._settings['bot_name']
+
+        self.storage_vk = self._get_setting('storage_vk')
 
         self.token_telegram = self._settings['token_telegram']
         self.token_vk = self._settings['token_vk']

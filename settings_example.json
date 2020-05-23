@@ -1,9 +1,15 @@
 {
   "dbms": "postgre",
 
+  "storage_vk" : {
+    "album_id":272532458,
+    "group_id": 192690840
+  },
+
   "token_telegram": "" ,
   "token_vk": "",
 
+  "bot_name": "debug_barahl0bot",
   "channel": "barahl0",
   "error_channel": "barahlochannel_error",
   "admins": ["fut33v"],
