@@ -274,6 +274,7 @@ class DrivetrainCategoryEnum(Enum):
     CHAINS = "Цепи"
     BOTTOMBRACKETS = "Каретки"
     CHAINRINGS = "Звезды (перед)"
+    SPROCKETS = "Звезды (зад)"
     FRONTDERAILLEURS = "Перед. переклюк"
     CASSETES = "Кассеты"
     FREEHUBS = "Барабаны"
@@ -1173,6 +1174,7 @@ if __name__ == "__main__":
         print("%s%s" % (pre, node.name))
 
     categories_string = ""
+    categories_list = []
     # leafs = [[node.name for node in children] for children in LevelOrderGroupIter(category_tree)]
     for pre, fill, node in RenderTree(category_tree):
         if node.children:
@@ -1180,7 +1182,10 @@ if __name__ == "__main__":
         if not isinstance(node.name, Enum):
             continue
         categories_string += "'" + str(node.name.name) + "',"
+        categories_list.append(node.name.name)
     print(categories_string)
+    for c in categories_list:
+        print(c)
 
     updater = Updater(_TOKEN_TELEGRAM, use_context=True)
     dispatcher = updater.dispatcher
