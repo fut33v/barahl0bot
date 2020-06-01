@@ -3,7 +3,8 @@
 
   "storage_vk" : {
     "album_id":272532458,
-    "group_id": 192690840
+    "group_id": 192690840,
+    "custom_path": "data"
   },
 
   "token_telegram": "" ,
