@@ -480,7 +480,7 @@ def photo_message_text():
     return message_text
 
 
-def get_chat(update):
+def get_chat(update) -> Chat:
     return CHATS_DICT[update.effective_chat.id]
 
 
@@ -944,6 +944,7 @@ def build_product_text(update):
            "<b>Отправка:</b> {ship}\n\n" \
            "<b>Цена:</b> {price} {currency}\n\n" \
            "<b>Продавец:</b> {seller}\n\n" \
+           '<b> История продавца:</b> <a href="{website}/tg_seller/{user_id}">тут</a>\n\n' \
            "<i>via @{bot_name}</i>".format(category_string=category_string,
                                            hashtags=hashtags,
                                            caption=html.escape(chat.caption),
@@ -953,7 +954,9 @@ def build_product_text(update):
                                            price=chat.price,
                                            currency=chat.currency.value,
                                            seller=seller,
-                                           bot_name=_SETTINGS.bot_name)
+                                           bot_name=_SETTINGS.bot_name,
+                                           website=_SETTINGS.website,
+                                           user_id=chat.user_id)
 
     return text
 
@@ -1175,17 +1178,16 @@ if __name__ == "__main__":
 
     categories_string = ""
     categories_list = []
-    # leafs = [[node.name for node in children] for children in LevelOrderGroupIter(category_tree)]
     for pre, fill, node in RenderTree(category_tree):
         if node.children:
             continue
         if not isinstance(node.name, Enum):
             continue
         categories_string += "'" + str(node.name.name) + "',"
-        categories_list.append(node.name.name)
+        categories_list.append(node.name)
     print(categories_string)
     for c in categories_list:
-        print(c)
+        print(c.name + '= "' + c.value + '"')
 
     updater = Updater(_TOKEN_TELEGRAM, use_context=True)
     dispatcher = updater.dispatcher
@@ -1195,8 +1197,6 @@ if __name__ == "__main__":
     dispatcher.add_handler(CommandHandler('addalbum', add_album_handler))
     dispatcher.add_handler(CommandHandler('removealbum', remove_album_handler))
     dispatcher.add_handler(CommandHandler('postitem', post_item_command_handler))
-
-    # dispatcher.add_handler(MessageHandler(callback=test_download_photo, filters=Filters.photo))
 
     back_handler = CallbackQueryHandler(post_item_go_back, pattern='^' + CallbackDataEnum.BACK.name + '$')
 
