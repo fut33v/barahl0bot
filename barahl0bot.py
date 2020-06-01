@@ -1,9 +1,6 @@
 import re
 import datetime
-import logging
-import re
-import sys
-import html
+import re, os, sys, html, logging
 from enum import Enum
 from functools import partial
 
@@ -944,7 +941,7 @@ def build_product_text(update):
            "<b>Отправка:</b> {ship}\n\n" \
            "<b>Цена:</b> {price} {currency}\n\n" \
            "<b>Продавец:</b> {seller}\n\n" \
-           '<b> История продавца:</b> <a href="{website}/tg_seller/{user_id}">тут</a>\n\n' \
+           '<b>История продавца:</b> <a href="{website}/tg_seller/{user_id}">тут</a>\n\n' \
            "<i>via @{bot_name}</i>".format(category_string=category_string,
                                            hashtags=hashtags,
                                            caption=html.escape(chat.caption),
@@ -992,22 +989,26 @@ def post_item_process_description(update, context):
     return UserState.WAITING_FOR_APPROVE
 
 
-def test_download_photo(update, context):
-    file_id = update.effective_message.photo[-1].file_id
-    file = context.bot.get_file(file_id)
-
-    filename = file.download()
-    try:
-        photo = _VK_INFO_GETTER.upload_photo(album_id=_SETTINGS.storage_vk['album_id'],
-                                             group_id=_SETTINGS.storage_vk['group_id'],
-                                             caption="caption",
-                                             photo_filename=filename)
-    except ApiError as e:
-        _LOGGER.error(e)
-        return None
-
-    # photo.owner_id
-    photo_hash = util.get_file_hash(filename)
+def build_vk_photo_description(chat: Chat, seller: TelegramSeller, message) -> str:
+    post_link = "https://t.me/{channel}/{post_id}".format(channel=_CHANNEL, post_id=message.message_id)
+    if seller.username:
+        seller = "Продавец: https://t.me/" + seller.username
+    else:
+        seller = "Продавца ищи в посте Telegram"
+    result = "{price} {currency}\n" \
+             "{seller}\n" \
+             "{city} / {ship}\n\n" \
+             "{caption}\n\n" \
+             "{descr}\n\n" \
+             "{post_link}".format(
+                post_link=post_link,
+                caption=chat.caption,
+                price=chat.price,
+                currency=chat.currency.value,
+                descr=chat.description, seller=seller,
+                city=chat.city.title,
+                ship=chat.ship.value)
+    return result
 
 
 def save_product_to_database(update, context, message):
@@ -1023,9 +1024,11 @@ def save_product_to_database(update, context, message):
     file_id = message.photo[-1].file_id
     file = context.bot.get_file(file_id)
 
-    filename = file.download()
+    photo_name = os.path.basename(file.file_path)
+    filename = "{}/{}".format(_VK_TMP_PHOTOS_PATH, photo_name)
+    filename = file.download(custom_path=filename)
 
-    vk_photo_description = chat.caption + "\n" + chat.description
+    vk_photo_description = build_vk_photo_description(chat, seller, message)
 
     try:
         photo = _VK_INFO_GETTER.upload_photo(album_id=_SETTINGS.storage_vk['album_id'],
@@ -1153,6 +1156,23 @@ def build_category_tree():
     return root
 
 
+def print_categories():
+    for pre, fill, node in RenderTree(category_tree):
+        print("%s%s" % (pre, node.name))
+    categories_string = ""
+    categories_list = []
+    for pre, fill, node in RenderTree(category_tree):
+        if node.children:
+            continue
+        if not isinstance(node.name, Enum):
+            continue
+        categories_string += "'" + str(node.name.name) + "',"
+        categories_list.append(node.name)
+    print(categories_string)
+    for c in categories_list:
+        print(c.name + '= "' + c.value + '"')
+
+
 if __name__ == "__main__":
     if len(sys.argv) != 2:
         print("give me json with settings as argument!")
@@ -1168,26 +1188,15 @@ if __name__ == "__main__":
     if not _SETTINGS.storage_vk:
         _LOGGER.error("No VK storage for Telegram photos specified")
         exit(-1)
+    _VK_TMP_PHOTOS_PATH = _SETTINGS.storage_vk['custom_path']
+
+    if not os.path.exists(_VK_TMP_PHOTOS_PATH):
+        os.mkdir(_VK_TMP_PHOTOS_PATH)
 
     logger_file_name = "{}_{}".format("bot", _CHANNEL)
     set_logger_handlers(logger_file_name)
 
     category_tree = build_category_tree()
-    for pre, fill, node in RenderTree(category_tree):
-        print("%s%s" % (pre, node.name))
-
-    categories_string = ""
-    categories_list = []
-    for pre, fill, node in RenderTree(category_tree):
-        if node.children:
-            continue
-        if not isinstance(node.name, Enum):
-            continue
-        categories_string += "'" + str(node.name.name) + "',"
-        categories_list.append(node.name)
-    print(categories_string)
-    for c in categories_list:
-        print(c.name + '= "' + c.value + '"')
 
     updater = Updater(_TOKEN_TELEGRAM, use_context=True)
     dispatcher = updater.dispatcher
