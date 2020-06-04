@@ -270,8 +270,8 @@ class PostgreBarahlochDatabase(BarahlochDatabase):
         photo_preview_link = none_if_empty(photo.get_preview_photo_url())
         photo_hash = product.photo_hash
         album_id = product.album.album_id
-        descr = none_if_empty(product.get_description_text(restrict=False))
-        comments = none_if_empty(product.get_comments_text(restrict=False))
+        descr = none_if_empty(product.get_description_text(restrict=False, with_new_lines=True))
+        comments = none_if_empty(product.get_comments_text(restrict=False, with_new_lines=True))
 
         with self._connection.cursor() as cursor:
             sql = 'INSERT INTO {t} (' \

@@ -79,7 +79,7 @@ class Product:
         if self.comments:
             self.comments_text = self.get_comments_text(self.comments)
 
-    def get_comments_text(self, restrict=True):
+    def get_comments_text(self, restrict=True, with_new_lines=False):
         if self.seller:
             seller_id = self.seller.vk_id
         else:
@@ -97,19 +97,21 @@ class Product:
         if comments_str:
             if restrict:
                 comments_str = comments_str[:settings.COMMENTS_STRING_RESTRICTION]
-            comments_str = comments_str.lower()
-            comments_str = comments_str.replace('\n', ' ')
+            # comments_str = comments_str.lower()
+            if not with_new_lines:
+                comments_str = comments_str.replace('\n', ' ')
             comments_str = html.escape(comments_str)
 
         return comments_str
 
-    def get_description_text(self, restrict=True):
+    def get_description_text(self, restrict=True, with_new_lines=False):
         text = self.photo.text
         if not text:
             return text
 
-        text = text.lower()
-        text = text.replace('\n', ' ')
+        # text = text.lower()
+        if not with_new_lines:
+            text = text.replace('\n', ' ')
         if restrict:
             text = text[:settings.DESCRIPTION_STRING_RESTRICTION]
         text = html.escape(text)
@@ -213,6 +215,8 @@ class Photo:
         return photo_url
 
     def get_preview_photo_url(self):
+        if self.sizes[-2]['width'] < 500:
+            return None
         photo_url = self.sizes[-2]['url']
         return photo_url
 
