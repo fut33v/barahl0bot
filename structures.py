@@ -73,43 +73,51 @@ class Product:
 
         self.descr = None
         self.comments_text = None
+        self.state = None
+        self.photo_link = None
 
         self.tg_post_id = None
 
         if self.comments:
             self.comments_text = self.get_comments_text(self.comments)
 
-    def get_comments_text(self, restrict=True, with_new_lines=False):
-        if self.seller:
-            seller_id = self.seller.vk_id
+    def get_comments_text(self, restrict=True, with_new_lines=False, from_db=False):
+        if from_db:
+            comments_str = self.comments_text
         else:
-            # in case of group/public/community photo
-            seller_id = self.photo.owner_id
-        comments = self.comments
+            if self.seller:
+                seller_id = self.seller.vk_id
+            else:
+                # in case of group/public/community photo
+                seller_id = self.photo.owner_id
+            comments = self.comments
 
-        comments_str = ""
-        if comments and seller_id:
-            if len(comments) > 0:
-                for c in comments:
-                    if 'from_id' and 'text' in c:
-                        if int(c['from_id']) == seller_id and c['text'] != "":
-                            comments_str += c['text'] + '\n'
+            comments_str = ""
+            if comments and seller_id:
+                if len(comments) > 0:
+                    for c in comments:
+                        if 'from_id' and 'text' in c:
+                            if int(c['from_id']) == seller_id and c['text'] != "":
+                                comments_str += c['text'] + '\n'
+
         if comments_str:
             if restrict:
                 comments_str = comments_str[:settings.COMMENTS_STRING_RESTRICTION]
-            # comments_str = comments_str.lower()
             if not with_new_lines:
                 comments_str = comments_str.replace('\n', ' ')
             comments_str = html.escape(comments_str)
 
         return comments_str
 
-    def get_description_text(self, restrict=True, with_new_lines=False):
-        text = self.photo.text
+    def get_description_text(self, restrict=True, with_new_lines=False, from_db=False):
+        if from_db:
+            text = self.descr
+        else:
+            text = self.photo.text
+
         if not text:
             return text
 
-        # text = text.lower()
         if not with_new_lines:
             text = text.replace('\n', ' ')
         if restrict:
@@ -118,29 +126,37 @@ class Product:
 
         return text
 
-    def build_message_telegram(self, channel, website):
+    def build_message_telegram(self, channel: str, website: str, from_db=False):
         photo = self.photo
-        photo_url = photo.get_widest_photo_url()
+        if from_db:
+            photo_url = self.photo_link
+        else:
+            photo_url = photo.get_widest_photo_url()
 
-        owner_id = self.album.owner_id
-        # seller_id = self.seller.vk_id
-        group_name = self.album.group_name
-        album_name = self.album.title
+        if not from_db:
+            owner_id = self.album.owner_id
+            group_name = self.album.group_name
+            album_name = self.album.title
+
         seller = self.seller
 
-        latest_product = "" + photo_url + "\n"
+        if from_db and self.state == 'SOLD':
+            latest_product = "ФОТО ВК УДАЛЕНО (СНЯТО С ПРОДАЖИ)\n" + photo_url + "\n"
+        else:
+            latest_product = "" + photo_url + "\n"
 
-        if owner_id > 0:
-            latest_product += "<b>{} {}/{}</b>\n\n".format(seller.first_name, seller.last_name, album_name)
-        elif album_name and group_name:
-            latest_product += "<b>{}/{}</b>\n\n".format(group_name, album_name)
+        if not from_db:
+            if owner_id > 0:
+                latest_product += "<b>{} {}/{}</b>\n\n".format(seller.first_name, seller.last_name, album_name)
+            elif album_name and group_name:
+                latest_product += "<b>{}/{}</b>\n\n".format(group_name, album_name)
 
-        text = self.get_description_text()
+        text = self.get_description_text(from_db=from_db)
         if text:
             text = make_numbers_bold(text)
             latest_product += "<b>Описание:</b> " + text + "\n\n"
 
-        comments_str = self.get_comments_text()
+        comments_str = self.get_comments_text(from_db=from_db)
         if comments_str and len(comments_str) + len(text) < settings.DESCRIPTION_PLUS_COMMENTS_STRING_RESTRICTION:
             comments_str = make_numbers_bold(comments_str)
             latest_product += "<b>Каменты:</b> " + comments_str + "\n\n"
@@ -160,7 +176,8 @@ class Product:
 
         latest_product += "\n"
 
-        latest_product += "<b>Фото:</b> {}\n".format(photo.build_url())
+        if not from_db:
+            latest_product += "<b>Фото:</b> {}\n".format(photo.build_url())
 
         if self.is_duplicate and self.prev_tg_post:
             latest_product += \

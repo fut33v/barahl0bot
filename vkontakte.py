@@ -129,3 +129,12 @@ class VkontakteInfoGetter:
         photo = Photo(photo[0])
 
         return photo
+
+    def check_is_sold(self, owner_id: int, photo_id: int) -> bool:
+        full_photo_id = "{}_{}".format(owner_id, photo_id)
+        try:
+            self._vk_api.photos.getById(photos=full_photo_id)
+        except vk_api.exceptions.ApiError as e:
+            if e.code == 200:
+                return True
+        return False
