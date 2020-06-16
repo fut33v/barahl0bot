@@ -12,7 +12,7 @@ def test(arg):
 
 @app.task
 def get_goods_and_start_check_for_sold():
-    goods = BarahlochTasksLogic.get_goods_show_ids(filter_days_down_limit=180, filter_days_up_limit=0)
+    goods = BarahlochTasksLogic.get_goods_show_ids(filter_days_down_limit=60, filter_days_up_limit=0)
     i = 0
     for g in goods:
         check_good_for_sold_and_mark_as_sold_if_so.apply_async((g[0], g[1]), countdown=i)
