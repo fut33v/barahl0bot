@@ -2,6 +2,7 @@ import logging
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from structures import Album, Product, Seller, City, Group, TelegramSeller, TelegramProduct, Photo
+import time
 
 _LOGGER = logging.getLogger("barahl0bot")
 
@@ -37,10 +38,9 @@ class PostgreBarahlochDatabase:
             return cursor.execute(sql, args)
         except Exception as e:
             _LOGGER.error("Problems with psycopg: {}".format(e))
-            raise e
-            # self._connection.connect()
-            # time.sleep(1)
-            # return cursor.execute(sql, args)
+            self._connection.connect()
+            time.sleep(0.5)
+            return cursor.execute(sql, args)
 
     def get_albums_list(self):
         sql = "SELECT * FROM {} ORDER BY owner_id".format(self._albums_table)
@@ -166,11 +166,18 @@ class PostgreBarahlochDatabase:
 
         return False
 
-    def get_goods_with_state_show_ids(self):
+    def get_goods_with_state_show_ids(self, filter_days_up_limit=None, filter_days_down_limit=None):
         ids_list = []
         with self._connection.cursor(cursor_factory=RealDictCursor) as cursor:
-            sql = "SELECT * FROM {t} WHERE state='SHOW' ORDER BY date".format(t=self._goods_table)
-            cursor.execute(sql)
+            if filter_days_up_limit is not None and filter_days_down_limit is not None:
+                sql = "SELECT * FROM {t} " \
+                      "WHERE state='SHOW' AND " \
+                      "date between (now() - '%s day'::interval) and (now() - '%s day'::interval) " \
+                      "ORDER BY date".format(t=self._goods_table)
+                cursor.execute(sql, (filter_days_down_limit, filter_days_up_limit, ))
+            else:
+                sql = "SELECT * FROM {t} WHERE state='SHOW' ORDER BY date".format(t=self._goods_table)
+                cursor.execute(sql)
             result = cursor.fetchall()
             if result:
                 for g in result:
@@ -204,7 +211,7 @@ class PostgreBarahlochDatabase:
     def set_good_sold(self, owner_id: int, photo_id: int):
         with self._connection.cursor() as cursor:
             sql = "UPDATE {t} SET state='SOLD' WHERE vk_owner_id=%s AND vk_photo_id=%s".format(t=self._goods_table)
-            cursor.execute(sql, (owner_id, photo_id,))
+            self._execute(cursor, sql, (owner_id, photo_id,))
         self._connection.commit()
 
     def insert_product(self, product):
@@ -430,6 +437,7 @@ def get_database(dbms: str, channel: str) -> PostgreBarahlochDatabase:
 if __name__ == "__main__":
     postgre_database = get_database("", "barahl0")
     p = postgre_database.get_product_by_owner_photo_id(-10698066, 457330012)
+    some_ids = postgre_database.get_goods_with_state_show_ids(filter_days_down_limit=30, filter_days_up_limit=0)
     print(p)
 
     # albums = postgre_database.get_albums_list()

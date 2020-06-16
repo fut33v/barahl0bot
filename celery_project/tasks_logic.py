@@ -44,8 +44,9 @@ class BarahlochTasksLogic:
             return te.message
 
     @staticmethod
-    def get_goods_show_ids():
-        return BarahlochTasksLogic._database.get_goods_with_state_show_ids()
+    def get_goods_show_ids(filter_days_down_limit, filter_days_up_limit):
+        return BarahlochTasksLogic._database.get_goods_with_state_show_ids(
+            filter_days_down_limit=filter_days_down_limit, filter_days_up_limit=filter_days_up_limit)
 
     @staticmethod
     def check_is_sold(owner_id: int, photo_id: int):
