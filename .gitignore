@@ -2,9 +2,11 @@
 .idea
 data/
 *.pid
-settings.json
 log
 *.db
-barahlochannel*.json
 chat_export
 .venv
+*.sql
+.venv
+settings.json
+barahlochannel*.json
