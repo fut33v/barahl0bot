@@ -12,7 +12,6 @@ import urllib.request
 
 from datetime import datetime
 from datetime import timezone
-import pytz
 
 from functools import partial
 
@@ -48,10 +47,6 @@ def get_unix_timestamp():
     return calendar.timegm(d.utctimetuple())
 
 
-def get_photo_time_from_unix_timestamp(_timestamp):
-    moscow = pytz.timezone('Europe/Moscow')
-    dt = datetime.fromtimestamp(_timestamp, moscow)
-    return "{:02d}.{:02d}.{} {:02d}:{:02d}".format(dt.day, dt.month, dt.year, dt.hour, dt.minute)
 
 
 def read_one_string_file(filename):
