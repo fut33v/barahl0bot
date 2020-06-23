@@ -189,6 +189,23 @@ class Product:
 
         return latest_product
 
+    def is_same_comments_and_descr(self, product_from_db):
+        my_comments = self.get_comments_text(restrict=False)
+        other_comments = product_from_db.get_comments_text(restrict=False, from_db=True)
+        same_comments = my_comments == other_comments
+
+        my_descr = self.get_description_text(restrict=False)
+        other_descr = product_from_db.get_description_text(restrict=False, from_db=True)
+        same_text = my_descr == other_descr
+
+        # if None and empty string
+        if not same_text and not my_descr and not other_descr:
+            same_text = True
+        if not same_comments and not my_comments and not other_comments:
+            same_comments = True
+
+        return same_comments and same_text
+
 
 class Photo:
     def __init__(self, _photos_get_result):

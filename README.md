@@ -12,13 +12,10 @@ Works here: https://t.me/barahlochannel
 
 ## Dependencies
 
-+ python3
-+ python-telegram-bot
-+ vk_api
-+ pytz
+Dependencies are in requirements.txt
+
+Install libpq-dev for psycopg2:
 
 ````
-$ pip3 install python-telegram-bot
-$ pip3 install vk_api
-$ pip3 install pytz
+sudo apt-get install libpq-dev
 ````

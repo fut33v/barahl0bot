@@ -1,0 +1,3 @@
+python-telegram-bot
+vk_api
+psycopg2

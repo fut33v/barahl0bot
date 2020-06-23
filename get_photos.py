@@ -65,7 +65,7 @@ class TelegramErrorHandler(logging.Handler):
         post_to_error_channel(msg)
 
 
-def try_update_post_message(product, product_from_db):
+def try_update_post_message(product: Product, product_from_db: Product):
     seller = product_from_db.seller
     # get seller from db, if not then add it (this code should be above
     if not product_from_db.seller.is_club():
@@ -73,19 +73,7 @@ def try_update_post_message(product, product_from_db):
 
     product.seller = seller
 
-    product_comments = product.get_comments_text(restrict=False)
-    same_comments = product_comments == product_from_db.comments_text
-
-    product_descr = product.get_description_text(restrict=False)
-    same_text = product_descr == product_from_db.descr
-
-    # if None and empty string
-    if not same_text and not product_descr and not product_from_db.descr:
-        same_text = True
-    if not same_comments and not product_comments and not product_from_db.comments_text:
-        same_comments = True
-
-    if same_comments and same_text:
+    if product.is_same_comments_and_descr(product_from_db):
         return
 
     product.photo_hash = product_from_db.photo_hash
