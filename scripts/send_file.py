@@ -1,5 +1,6 @@
 from settings import Barahl0botSettings
-import sys, os
+import sys
+import os
 import telegram
 from telegram.bot import Bot
 
@@ -19,6 +20,7 @@ if __name__ == "__main__":
     with open(filename_to_send, "rb") as f:
         filename = os.path.basename(filename_to_send)
         bot.send_document(chat_id='@'+channel_name, document=f, filename=filename)
+
 
 
 

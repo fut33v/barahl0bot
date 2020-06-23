@@ -1,0 +1,7 @@
+API_ID = 0
+API_HASH = ''
+TOKEN = ''
+PHONE = ''
+DATABASE_ENCRYPTION_KEY = """
+
+"""

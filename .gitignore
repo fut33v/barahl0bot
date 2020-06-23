@@ -4,6 +4,8 @@ data/
 *.pid
 log
 *.db
+chat_export
+.venv
 *.sql
 .venv
 settings.json

@@ -6,7 +6,7 @@ import sys
 import os
 from settings import Barahl0botSettings
 
-_SETTINGS_JSON_FILENAME = "../settings.json"
+_SETTINGS_JSON_FILENAME = "../../settings.json"
 _SETTINGS = Barahl0botSettings(_SETTINGS_JSON_FILENAME)
 # _SETTINGS = bot_util.load_json_file(_SETTINGS_JSON_FILENAME)
 # _TOKEN_VK = _SETTINGS['token_vk']

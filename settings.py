@@ -47,7 +47,7 @@ class Barahl0botSettings:
         seconds_to_sleep_limit_reached = self._get_setting('seconds_to_sleep_limit_reached')
         if seconds_to_sleep_limit_reached:
             self.seconds_to_sleep_limit_reached = seconds_to_sleep_limit_reached
-        days_timeout_for_product = self._get_setting('days_timeout_for_product')
+        days_timeout_for_product = self._settings.get('days_timeout_for_product', None)
         if days_timeout_for_product:
             self.days_timeout_for_product = days_timeout_for_product
 
