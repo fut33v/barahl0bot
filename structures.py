@@ -1,7 +1,7 @@
 import logging
 import settings
 import html
-from util import make_numbers_bold, get_unix_timestamp
+from util import get_unix_timestamp
 
 _LOGGER = logging.getLogger("barahl0bot")
 
@@ -151,14 +151,12 @@ class Product:
             elif album_name and group_name:
                 latest_product += "<b>{}/{}</b>\n\n".format(group_name, album_name)
 
-        text = self.get_description_text(from_db=from_db)
+        text = self.get_description_text(from_db=from_db, with_new_lines=True)
         if text:
-            text = make_numbers_bold(text)
             latest_product += "<b>Описание:</b> " + text + "\n\n"
 
-        comments_str = self.get_comments_text(from_db=from_db)
+        comments_str = self.get_comments_text(from_db=from_db, with_new_lines=True)
         if comments_str and len(comments_str) + len(text) < settings.DESCRIPTION_PLUS_COMMENTS_STRING_RESTRICTION:
-            comments_str = make_numbers_bold(comments_str)
             latest_product += "<b>Каменты:</b> " + comments_str + "\n\n"
 
         # _OWNER_ID_POST_BY_GROUP_ADMIN
