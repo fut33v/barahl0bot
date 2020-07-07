@@ -1,7 +1,7 @@
 import logging
 import settings
 import html
-from util import make_numbers_bold, get_unix_timestamp
+from util import get_unix_timestamp
 
 _LOGGER = logging.getLogger("barahl0bot")
 
@@ -151,14 +151,12 @@ class Product:
             elif album_name and group_name:
                 latest_product += "<b>{}/{}</b>\n\n".format(group_name, album_name)
 
-        text = self.get_description_text(from_db=from_db)
+        text = self.get_description_text(from_db=from_db, with_new_lines=True)
         if text:
-            text = make_numbers_bold(text)
             latest_product += "<b>Описание:</b> " + text + "\n\n"
 
-        comments_str = self.get_comments_text(from_db=from_db)
+        comments_str = self.get_comments_text(from_db=from_db, with_new_lines=True)
         if comments_str and len(comments_str) + len(text) < settings.DESCRIPTION_PLUS_COMMENTS_STRING_RESTRICTION:
-            comments_str = make_numbers_bold(comments_str)
             latest_product += "<b>Каменты:</b> " + comments_str + "\n\n"
 
         # _OWNER_ID_POST_BY_GROUP_ADMIN
@@ -188,6 +186,23 @@ class Product:
         latest_product += "<b>История продавца:</b> <a href=\"{}seller/{}\">тут</a>\n".format(website, seller.vk_id)
 
         return latest_product
+
+    def is_same_comments_and_descr(self, product_from_db):
+        my_comments = self.get_comments_text(restrict=False)
+        other_comments = product_from_db.get_comments_text(restrict=False, from_db=True)
+        same_comments = my_comments == other_comments
+
+        my_descr = self.get_description_text(restrict=False)
+        other_descr = product_from_db.get_description_text(restrict=False, from_db=True)
+        same_text = my_descr == other_descr
+
+        # if None and empty string
+        if not same_text and not my_descr and not other_descr:
+            same_text = True
+        if not same_comments and not my_comments and not other_comments:
+            same_comments = True
+
+        return same_comments and same_text
 
 
 class Photo:

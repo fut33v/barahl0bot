@@ -47,8 +47,6 @@ def get_unix_timestamp():
     return calendar.timegm(d.utctimetuple())
 
 
-
-
 def read_one_string_file(filename):
     try:
         f = open(filename, 'r')
