@@ -10,3 +10,4 @@ chat_export
 .venv
 settings.json
 barahlochannel*.json
+*.swp

@@ -1,8 +1,11 @@
 import logging
+import time
+
 import psycopg2
 from psycopg2.extras import RealDictCursor
-from structures import Album, Product, Seller, City, Group, TelegramSeller, TelegramProduct, Photo
-import time
+
+from .structures import Album, Product, Seller, City, Group, TelegramSeller, TelegramProduct, Photo
+
 
 _LOGGER = logging.getLogger("barahl0bot")
 
@@ -433,38 +436,3 @@ class PostgreBarahlochDatabase:
 def get_database(dbms: str, channel: str) -> PostgreBarahlochDatabase:
     return PostgreBarahlochDatabase(channel)
 
-
-if __name__ == "__main__":
-    postgre_database = get_database("", "barahl0")
-    p = postgre_database.get_product_by_owner_photo_id(-10698066, 457330012)
-    some_ids = postgre_database.get_goods_with_state_show_ids(filter_days_down_limit=30, filter_days_up_limit=0)
-    print(p)
-
-    # albums = postgre_database.get_albums_list()
-    # print(albums)
-    #
-    # print(postgre_database.is_album_in_table(albums[0]))
-    #
-    # test_city = City(city_id=35, title="Novgorod")
-    # seller = TelegramSeller(tg_id=228,
-    #                         tg_chat_id=228,
-    #                         full_name="peedor",
-    #                         username="peedor228",
-    #                         city=test_city)
-    #
-    # from barahl0bot import BikesCategoryEnum, CurrencyEnum, ShippingEnum
-    #
-    # test_tg_product = TelegramProduct(seller=seller,
-    #                                   tg_post_id=2289,
-    #                                   photo_link="xyu",
-    #                                   caption="pasdf",
-    #                                   descr="aasdfasd",
-    #                                   category=BikesCategoryEnum.FIX,
-    #                                   currency=CurrencyEnum.EUR,
-    #                                   price=228,
-    #                                   ship=ShippingEnum.DO_NOT_SHIP,
-    #                                   photo_hash="bb72db68ecddcb393305e5997144d9fa3128d2cf4239e5f228b504e5f1c3cc96",
-    #                                   vk_owner_id=12345,
-    #                                   vk_photo_id=54321)
-    #
-    # postgre_database.insert_tg_product(test_tg_product)

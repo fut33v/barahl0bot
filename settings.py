@@ -1,4 +1,4 @@
-import util
+from .util import load_json_file
 
 COMMENTS_STRING_RESTRICTION = 600
 DESCRIPTION_STRING_RESTRICTION = 600
@@ -7,7 +7,7 @@ DESCRIPTION_PLUS_COMMENTS_STRING_RESTRICTION = 700
 
 class Barahl0botSettings:
     def __init__(self, _filename):
-        self._settings = util.load_json_file(_filename)
+        self._settings = load_json_file(_filename)
         print(self._settings)
 
         self.dbms = self._settings['dbms']

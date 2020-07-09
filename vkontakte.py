@@ -1,9 +1,10 @@
-import vk_api
 from enum import IntEnum
 
-from util import get_from_dict
-from structures import Seller, Group, City, Photo
 import requests
+import vk_api
+
+from .util import get_from_dict
+from .structures import Seller, Group, City, Photo
 
 
 class VkErrorCodesEnum(IntEnum):

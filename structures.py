@@ -1,7 +1,9 @@
 import logging
-import settings
 import html
-from util import get_unix_timestamp
+
+from .util import get_unix_timestamp
+from .settings import COMMENTS_STRING_RESTRICTION, DESCRIPTION_STRING_RESTRICTION, DESCRIPTION_PLUS_COMMENTS_STRING_RESTRICTION
+
 
 _LOGGER = logging.getLogger("barahl0bot")
 
@@ -102,7 +104,7 @@ class Product:
 
         if comments_str:
             if restrict:
-                comments_str = comments_str[:settings.COMMENTS_STRING_RESTRICTION]
+                comments_str = comments_str[:COMMENTS_STRING_RESTRICTION]
             if not with_new_lines:
                 comments_str = comments_str.replace('\n', ' ')
             comments_str = html.escape(comments_str)
@@ -121,7 +123,7 @@ class Product:
         if not with_new_lines:
             text = text.replace('\n', ' ')
         if restrict:
-            text = text[:settings.DESCRIPTION_STRING_RESTRICTION]
+            text = text[:DESCRIPTION_STRING_RESTRICTION]
         text = html.escape(text)
 
         return text
@@ -156,7 +158,7 @@ class Product:
             latest_product += "<b>Описание:</b> " + text + "\n\n"
 
         comments_str = self.get_comments_text(from_db=from_db, with_new_lines=True)
-        if comments_str and len(comments_str) + len(text) < settings.DESCRIPTION_PLUS_COMMENTS_STRING_RESTRICTION:
+        if comments_str and len(comments_str) + len(text) < DESCRIPTION_PLUS_COMMENTS_STRING_RESTRICTION:
             latest_product += "<b>Каменты:</b> " + comments_str + "\n\n"
 
         # _OWNER_ID_POST_BY_GROUP_ADMIN
