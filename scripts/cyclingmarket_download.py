@@ -63,6 +63,10 @@ def update_url_id(message_file_name, directory):
     print(message_id)
     r = tg.call_method('getMessageLink', params={'chat_id': chat_id, 'message_id': message_id})
     r.wait()
+    if not r.update:
+        return
+    if 'url' not in r.update:
+        return
     url_id = r.update['url'].split('/')[-1]
     print('https://t.me/cyclingmarket/{}'.format(url_id))
     full_path = os.path.join(directory, message_file_name)
@@ -152,6 +156,7 @@ def process_singles():
                 'profile_photo': seller.get('profile_photo', None),
             },
             'photo': photo_file_id,
+            'date': data['date']
         }
 
         url_id = data['url_id']
