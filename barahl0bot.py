@@ -8,10 +8,10 @@ import telegram.ext
 from telegram.ext import Updater, CommandHandler
 from vk_api.exceptions import ApiError
 
-import database
-from settings import Barahl0botSettings
-from structures import Album
-from vkontakte import VkontakteInfoGetter
+from bullshit.database import PostgreBarahlochDatabase
+from bullshit.settings import Barahl0botSettings
+from bullshit.structures import Album
+from bullshit.vkontakte import VkontakteInfoGetter
 
 __author__ = 'fut33v'
 
@@ -133,7 +133,7 @@ if __name__ == "__main__":
     _SETTINGS = Barahl0botSettings(settings_filename)
     _TOKEN_TELEGRAM = _SETTINGS.token_telegram
     _CHANNEL = _SETTINGS.channel
-    _DATABASE = database.get_database(_SETTINGS.dbms, _CHANNEL)
+    _DATABASE = PostgreBarahlochDatabase(_CHANNEL)
     _VK_INFO_GETTER = VkontakteInfoGetter(_SETTINGS.token_vk)
 
     if not _SETTINGS.storage_vk:
