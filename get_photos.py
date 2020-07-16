@@ -12,11 +12,11 @@ import vk_api.exceptions
 import telegram.ext
 import telegram.error
 
-from settings import Barahl0botSettings
-import database
-from vkontakte import VkErrorCodesEnum, VkontakteInfoGetter
-from structures import Album, Photo, Seller, Product
-import util
+from bullshit.settings import Barahl0botSettings
+from bullshit.database import PostgreBarahlochDatabase
+from bullshit.vkontakte import VkErrorCodesEnum, VkontakteInfoGetter
+from bullshit.structures import Album, Photo, Seller, Product
+from bullshit import util
 
 
 _OWNER_ID_POST_BY_GROUP_ADMIN = 100
@@ -318,7 +318,7 @@ if __name__ == "__main__":
     _WEBSITE = _SETTINGS.website
     _ERROR_CHANNEL = _SETTINGS.error_channel
 
-    _DATABASE = database.get_database(_SETTINGS.dbms, _CHANNEL)
+    _DATABASE = PostgreBarahlochDatabase(_CHANNEL)
 
     _VK_INFO_GETTER = VkontakteInfoGetter(_SETTINGS.token_vk)
 
