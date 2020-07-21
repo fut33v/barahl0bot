@@ -201,6 +201,7 @@ class PostgreBarahlochDatabase:
                 product.photo_hash = result['hash']
                 product.state = result['state']
                 product.photo_link = result['photo_link']
+                product.date = result['date']
                 # todo: select all with that hash and count > 1 duplicate
                 # prev_by_hash = self.is_photo_posted_by_hash(product.photo_hash)
                 # if prev_by_hash:
