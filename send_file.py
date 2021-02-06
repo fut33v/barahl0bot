@@ -1,4 +1,4 @@
-from settings import Barahl0botSettings
+from bullshit.settings import Barahl0botSettings
 import sys, os
 import telegram
 from telegram.bot import Bot
