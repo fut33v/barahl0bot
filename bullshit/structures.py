@@ -145,7 +145,7 @@ class Product:
         if from_db and self.state == 'SOLD':
             latest_product = "ФОТО ВК УДАЛЕНО (СНЯТО С ПРОДАЖИ)\n" + photo_url + "\n"
         else:
-            latest_product = "" + photo_url + "\n"
+            latest_product = "<a href=\"{}\">свободу политзаключенным</a>\n".format(photo_url)
 
         if not from_db:
             if owner_id > 0:
