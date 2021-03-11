@@ -25,6 +25,8 @@ class Barahl0botSettings:
 
         self.error_channel = self._get_setting('error_channel')
 
+        self.banned = self._settings.get('banned', [])
+
         self.seconds_to_sleep = 90
         self.timeout_for_photo_seconds = 180
         self.too_old_for_photo_seconds = 24 * 60 * 60

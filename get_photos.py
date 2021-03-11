@@ -26,6 +26,7 @@ _LOGGER = logging.getLogger("barahl0bot")
 _LOGS_DIR = 'log'
 _FH_DEBUG = None
 _FH_ERROR = None
+_BANNED = []
 
 _ERROR_GET_PHOTOS_X_PHOTOS_NONE_COUNT = 0
 
@@ -133,6 +134,16 @@ def get_products_from_album(_album):
 
     for vk_photo_dict in photos:
 
+        # if user album (id of owner is positive) and 'user_id' not in photo
+        if _album.owner_id > 0:
+            seller_id = _album.owner_id
+        else:
+            seller_id = vk_photo_dict['user_id']
+
+        if seller_id in _BANNED:
+            _LOGGER.info("skipping banned user https://vk.com/id{}".format(seller_id))
+            continue
+
         photo = Photo(vk_photo_dict)
         diff = photo.get_photo_age()
 
@@ -158,12 +169,6 @@ def get_products_from_album(_album):
             prev_tg_post = prev_by_hash['tg_post_id']
             prev_tg_date = prev_by_hash['date']
             is_duplicate = True
-
-        # if user album (id of owner is positive) and 'user_id' not in photo
-        if _album.owner_id > 0:
-            seller_id = _album.owner_id
-        else:
-            seller_id = vk_photo_dict['user_id']
 
         if seller_id != _OWNER_ID_POST_BY_GROUP_ADMIN:
             seller = _DATABASE.get_seller_by_id(seller_id)
@@ -235,7 +240,6 @@ def process_album(_album):
     photos_links = [p.photo.build_url() for p in products]
     _LOGGER.info("{} New products: {}".format(len(products), str(photos_links).strip('[]')))
 
-    # now = datetime.datetime.now()
     now = datetime.now(timezone.utc)
 
     for p in products:
@@ -313,6 +317,7 @@ if __name__ == "__main__":
     settings_filename = sys.argv[1]
     _SETTINGS = Barahl0botSettings(settings_filename)
 
+    _BANNED = _SETTINGS.banned
     _TOKEN_TELEGRAM = _SETTINGS.token_telegram
     _CHANNEL = _SETTINGS.channel
     _WEBSITE = _SETTINGS.website
